@@ -544,7 +544,7 @@ function buildTree(t) {
     const bw = Math.max(6, t.bondGirth);
     const baseW = Math.max(ew, bw) * 0.5 + (ew + bw) * 0.34; // 合流部（股の下）の太さ
     const flare = baseW * 1.24;
-    const forkY = baseY - H * 0.34;          // 股（合流点）の高さ
+    const forkY = baseY - H * 0.48;          // 股（合流点）の高さ＝下部はしっかり1本立つ
     t.isFork = true; t.forkY = forkY;
     const spreadL = 40 + ew * 0.55;          // 太い枝ほど大きく広がる
     const spreadR = 40 + bw * 0.55;
@@ -555,7 +555,7 @@ function buildTree(t) {
     const LTx = CX - spreadL + lean(yTipL);  // 左（株）先端の中心
     const RTx = CX + spreadR + lean(yTipR);  // 右（債券）先端の中心
     const Cx = CX + lean(forkY);             // 股の谷の中心
-    const valleyDip = 7;                      // 股の谷の丸み
+    const valleyDip = 3;                      // 股の谷の丸み（浅め＝裂けて見えない）
 
     // 高さ別の制御点 y
     const yOL = baseY - H * 0.55,  yOL2 = baseY - H * 0.82;   // 左 外側
