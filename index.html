@@ -498,70 +498,110 @@ function buildTree(t) {
   const greenMain = wind > 0.55 ? "#8fae7a" : "#79b46f"; // 暴風は少しくすむ
   const greenDk = "#5e9a59";
 
-  let parts = []; // {id, path, attrs}
+  let trunkSVG = "";
   let leaves = "";
   let twigs = "";
 
   const baseY = GROUND;
+  const f1 = n => n.toFixed(1);
+  // 幹の継ぎ目を消すための「やわらかい縁取り」共通属性
+  const trunkStroke = `stroke="#6b4f33" stroke-width="1.1" stroke-opacity="0.16" stroke-linejoin="round"`;
 
   if (t.forkRatio <= 0.02) {
-    /* ----- 1本幹（株式100%）----- */
+    /* ----- 1本幹（株式100%）：根元の末広がり＋自然なテーパー ----- */
+    t.isFork = false;
     const H = t.H;
-    const w0 = Math.max(5, t.equityGirth);
-    const w1 = Math.max(2, w0 * 0.22);
-    const topX = CX + windLean;
-    const topY = baseY - H;
-    const c1x = CX + windLean * 0.30, c1y = baseY - H * 0.45;
-    const c2x = CX + windLean * 0.75, c2y = baseY - H * 0.80;
-    const path = ribbon(CX, baseY, w0, topX, topY, w1, c1x, c1y, c2x, c2y);
-    parts.push({ id: "equity", path, fill: "url(#barkE)" });
+    const lean = y => windLean * Math.pow(clamp((GROUND - y) / H, 0, 1), 1.25);
+    const w0 = Math.max(6, t.equityGirth);     // 根元の太さ
+    const flare = w0 * 1.24;                    // 接地部の末広がり
+    const wTip = Math.max(2.5, w0 * 0.16);
+    const yTip = baseY - H;
+    const tipX = CX + lean(yTip);
+    const yA = baseY - H * 0.50, yB = baseY - H * 0.82;
+    const wHi = w0 * 0.34;
+    const BLx = CX - flare / 2, BRx = CX + flare / 2;
+
+    const path =
+      `M ${f1(BLx)} ${f1(baseY)} ` +
+      `C ${f1(CX - w0 * 0.52 + lean(yA))} ${f1(yA)}, ${f1(tipX - wHi / 2 - 2 + lean(yB))} ${f1(yB)}, ${f1(tipX - wTip / 2)} ${f1(yTip)} ` +
+      `Q ${f1(tipX)} ${f1(yTip - wTip * 1.7)}, ${f1(tipX + wTip / 2)} ${f1(yTip)} ` +
+      `C ${f1(tipX + wHi / 2 + 2 + lean(yB))} ${f1(yB)}, ${f1(CX + w0 * 0.52 + lean(yA))} ${f1(yA)}, ${f1(BRx)} ${f1(baseY)} Z`;
+
+    trunkSVG += `<path class="hit" data-part="trunk" d="${path}" fill="url(#barkE)" ${trunkStroke}/>`;
+    // バーク（樹皮）の陰影ライン
+    trunkSVG += `<path d="M ${f1(CX + lean(baseY - H*0.2))} ${f1(baseY - H*0.12)} C ${f1(CX + lean(yA))} ${f1(yA)}, ${f1(tipX + lean(yB))} ${f1(yB)}, ${f1(tipX)} ${f1(yTip + 6)}" stroke="#6b4a2c" stroke-width="${Math.max(1, w0*0.10)}" stroke-opacity="0.18" fill="none" stroke-linecap="round"/>`;
+
     const cr = 26 + w0 * 0.9 + lush * 14;
-    leaves += leafCluster(topX, topY - cr * 0.2, cr, greenMain);
-    leaves += leafCluster(topX - cr*0.5, topY + cr*0.2, cr*0.6, greenDk);
-    // その他の小枝（1本幹の上部から）
-    twigs += buildTwigs(t, c2x, c2y, topX, topY, windLean);
+    leaves += leafCluster(tipX, yTip - cr * 0.2, cr, greenMain);
+    leaves += leafCluster(tipX - cr * 0.5, yTip + cr * 0.2, cr * 0.6, greenDk);
+    twigs += buildTwigs(t, CX + lean(yB), yB, tipX, yTip, windLean);
   } else {
-    /* ----- 二股（株 + 債券）----- */
-    const H = t.H;
-    const forkH = H * 0.30;
-    const forkY = baseY - forkH;
-    const ew = Math.max(5, t.equityGirth);
-    const bw = Math.max(5, t.bondGirth);
-    const baseW = (ew + bw) * 0.62;
-    // 共有の下部幹
-    const sc1x = CX + windLean * 0.12, sc1y = baseY - forkH * 0.5;
-    parts.push({
-      id: "base",
-      path: ribbon(CX, baseY, baseW, CX + windLean * 0.18, forkY, (ew + bw) * 0.5, sc1x, sc1y, CX + windLean * 0.18, forkY + 4),
-      fill: "url(#barkB)"
-    });
-    const spread = 66;
-    // 株の幹（左に伸びる）
-    {
-      const topX = CX - spread + windLean;
-      const topY = baseY - H;
-      const w1 = Math.max(2, ew * 0.22);
-      const c1x = CX - spread*0.5 + windLean*0.3, c1y = forkY - (H-forkH)*0.45;
-      const c2x = topX, c2y = baseY - H*0.82;
-      parts.push({ id: "equity", path: ribbon(CX + windLean*0.18, forkY, ew, topX, topY, w1, c1x, c1y, c2x, c2y), fill: "url(#barkE)" });
-      const cr = 24 + ew * 0.85 + lush * 12;
-      leaves += leafCluster(topX, topY - cr*0.15, cr, greenMain);
-      leaves += leafCluster(topX - cr*0.45, topY + cr*0.25, cr*0.55, greenDk);
-      twigs += buildTwigs(t, c1x, c1y, topX, topY, windLean);
-    }
-    // 債券の幹（右に伸びる、株より少し低め）
-    {
-      const Hb = H * 0.92;
-      const topX = CX + spread + windLean;
-      const topY = baseY - Hb;
-      const w1 = Math.max(2, bw * 0.22);
-      const c1x = CX + spread*0.5 + windLean*0.3, c1y = forkY - (Hb-forkH)*0.45;
-      const c2x = topX, c2y = baseY - Hb*0.82;
-      parts.push({ id: "bond", path: ribbon(CX + windLean*0.18, forkY, bw, topX, topY, w1, c1x, c1y, c2x, c2y), fill: "url(#barkBond)" });
-      const cr = 24 + bw * 0.8 + lush * 10;
-      leaves += leafCluster(topX, topY - cr*0.15, cr, "#7bbf86"); // 債券側は少し青みの緑
-      leaves += leafCluster(topX + cr*0.45, topY + cr*0.25, cr*0.55, "#5aa06a");
-    }
+    /* ----- 二股（株 + 債券）：地面から先端まで一筆の連続シルエット ----- */
+    const H = t.H;            // 株（左）の高さ
+    const Hb = H * 0.94;      // 債券（右）は少し低く自然な非対称に
+    const lean = y => windLean * Math.pow(clamp((GROUND - y) / H, 0, 1), 1.25);
+    const ew = Math.max(6, t.equityGirth);
+    const bw = Math.max(6, t.bondGirth);
+    const baseW = Math.max(ew, bw) * 0.5 + (ew + bw) * 0.34; // 合流部（股の下）の太さ
+    const flare = baseW * 1.24;
+    const forkY = baseY - H * 0.34;          // 股（合流点）の高さ
+    t.isFork = true; t.forkY = forkY;
+    const spreadL = 40 + ew * 0.55;          // 太い枝ほど大きく広がる
+    const spreadR = 40 + bw * 0.55;
+    const wlTip = Math.max(2.5, ew * 0.16);
+    const wrTip = Math.max(2.5, bw * 0.16);
+
+    const yTipL = baseY - H, yTipR = baseY - Hb;
+    const LTx = CX - spreadL + lean(yTipL);  // 左（株）先端の中心
+    const RTx = CX + spreadR + lean(yTipR);  // 右（債券）先端の中心
+    const Cx = CX + lean(forkY);             // 股の谷の中心
+    const valleyDip = 7;                      // 股の谷の丸み
+
+    // 高さ別の制御点 y
+    const yOL = baseY - H * 0.55,  yOL2 = baseY - H * 0.82;   // 左 外側
+    const yIL = baseY - H * 0.78,  yIL2 = forkY - H * 0.10;   // 左 内側
+    const yIR = forkY - Hb * 0.10, yIR2 = baseY - Hb * 0.78;  // 右 内側
+    const yOR2 = baseY - Hb * 0.82, yOR = baseY - Hb * 0.55;  // 右 外側
+
+    const BLx = CX - flare / 2, BRx = CX + flare / 2;
+    const VL = Cx - 3, VR = Cx + 3, Vy = forkY + valleyDip;
+
+    const path =
+      `M ${f1(BLx)} ${f1(baseY)} ` +
+      // 左枝 外側（根元 → 左先端の外側）
+      `C ${f1(CX - baseW * 0.55 + lean(yOL))} ${f1(yOL)}, ${f1(LTx - wlTip / 2 - 5 + lean(yOL2))} ${f1(yOL2)}, ${f1(LTx - wlTip / 2)} ${f1(yTipL)} ` +
+      // 左先端のキャップ
+      `Q ${f1(LTx)} ${f1(yTipL - wlTip * 1.7)}, ${f1(LTx + wlTip / 2)} ${f1(yTipL)} ` +
+      // 左枝 内側（左先端 → 股の谷）
+      `C ${f1(LTx + wlTip / 2 + 3 + lean(yIL))} ${f1(yIL)}, ${f1(Cx - ew * 0.34 + lean(yIL2))} ${f1(yIL2)}, ${f1(VL)} ${f1(Vy)} ` +
+      // 股の谷（やわらかいU字）
+      `Q ${f1(Cx)} ${f1(Vy + 3)}, ${f1(VR)} ${f1(Vy)} ` +
+      // 右枝 内側（股の谷 → 右先端）
+      `C ${f1(Cx + bw * 0.34 + lean(yIR))} ${f1(yIR)}, ${f1(RTx - wrTip / 2 - 3 + lean(yIR2))} ${f1(yIR2)}, ${f1(RTx - wrTip / 2)} ${f1(yTipR)} ` +
+      // 右先端のキャップ
+      `Q ${f1(RTx)} ${f1(yTipR - wrTip * 1.7)}, ${f1(RTx + wrTip / 2)} ${f1(yTipR)} ` +
+      // 右枝 外側（右先端 → 根元）
+      `C ${f1(RTx + wrTip / 2 + 5 + lean(yOR2))} ${f1(yOR2)}, ${f1(CX + baseW * 0.55 + lean(yOR))} ${f1(yOR)}, ${f1(BRx)} ${f1(baseY)} Z`;
+
+    // 左右で株（緑みの茶）→債券（明るい茶）に滑らかに変わる横グラデーション
+    trunkSVG += `<path class="hit" data-part="trunk" d="${path}" fill="url(#barkFork)" ${trunkStroke}/>`;
+
+    // 股の内側に落ちる影（奥行き）
+    trunkSVG += `<path d="M ${f1(Cx - ew*0.30 + lean(forkY))} ${f1(forkY - H*0.06)} Q ${f1(Cx)} ${f1(Vy + 2)}, ${f1(Cx + bw*0.30 + lean(forkY))} ${f1(forkY - Hb*0.06)}" stroke="#5e4228" stroke-width="3" stroke-opacity="0.22" fill="none" stroke-linecap="round"/>`;
+    // 各枝に沿う樹皮の陰影ライン（下〜中部のみ・ごく控えめ）
+    const yMidL = baseY - H * 0.58, yMidR = baseY - Hb * 0.58;
+    trunkSVG += `<path d="M ${f1(CX - baseW*0.16 + lean(baseY - H*0.16))} ${f1(baseY - H*0.16)} Q ${f1((Cx+LTx)/2 - ew*0.1 + lean(yIL))} ${f1(yIL)}, ${f1((Cx+LTx)/2 + lean(yMidL))} ${f1(yMidL)}" stroke="#6b4a2c" stroke-width="${Math.max(1, ew*0.07)}" stroke-opacity="0.12" fill="none" stroke-linecap="round"/>`;
+    trunkSVG += `<path d="M ${f1(CX + baseW*0.16 + lean(baseY - Hb*0.16))} ${f1(baseY - Hb*0.16)} Q ${f1((Cx+RTx)/2 + bw*0.1 + lean(yIR2))} ${f1(yIR2)}, ${f1((Cx+RTx)/2 + lean(yMidR))} ${f1(yMidR)}" stroke="#6b4a2c" stroke-width="${Math.max(1, bw*0.07)}" stroke-opacity="0.12" fill="none" stroke-linecap="round"/>`;
+
+    // 左（株）の樹冠
+    const crL = 24 + ew * 0.85 + lush * 12;
+    leaves += leafCluster(LTx, yTipL - crL * 0.15, crL, greenMain);
+    leaves += leafCluster(LTx - crL * 0.45, yTipL + crL * 0.25, crL * 0.55, greenDk);
+    twigs += buildTwigs(t, Cx, forkY, LTx, yTipL, windLean);
+    // 右（債券）の樹冠（少し青みの緑）
+    const crR = 24 + bw * 0.8 + lush * 10;
+    leaves += leafCluster(RTx, yTipR - crR * 0.15, crR, "#7bbf86");
+    leaves += leafCluster(RTx + crR * 0.45, yTipR + crR * 0.25, crR * 0.55, "#5aa06a");
   }
 
   // 根（現金）
@@ -589,11 +629,6 @@ function buildTree(t) {
     }
   }
 
-  // 組み立て
-  const trunkPaths = parts.map(p =>
-    `<path class="hit" data-part="${p.id}" d="${p.path}" fill="${p.fill}" stroke="#6b4f33" stroke-width="1" stroke-opacity="0.25"/>`
-  ).join("");
-
   const svg = `
   <svg class="tree" viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" style="--amp:${swayAmp}deg; --dur:${swayDur}s;">
     <defs>
@@ -605,6 +640,13 @@ function buildTree(t) {
       </linearGradient>
       <linearGradient id="barkBond" x1="0" y1="1" x2="0" y2="0">
         <stop offset="0" stop-color="#a9854f"/><stop offset="1" stop-color="#c6a36a"/>
+      </linearGradient>
+      <!-- 二股用：左(株)→右(債券) を横方向になめらかに変化させ継ぎ目を消す -->
+      <linearGradient id="barkFork" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0"    stop-color="#8f6238"/>
+        <stop offset="0.42" stop-color="#a9794a"/>
+        <stop offset="0.58" stop-color="#b58a55"/>
+        <stop offset="1"    stop-color="#c8a76c"/>
       </linearGradient>
       <radialGradient id="sun" cx="0.82" cy="0.16" r="0.3">
         <stop offset="0" stop-color="#fff6da"/><stop offset="1" stop-color="#fff6da" stop-opacity="0"/>
@@ -628,7 +670,7 @@ function buildTree(t) {
 
     <!-- 揺れるグループ（幹＋枝＋葉） -->
     <g class="sway" style="transform-origin:${CX}px ${GROUND}px;">
-      ${trunkPaths}
+      ${trunkSVG}
       <g class="hit" data-part="branches">${twigs}</g>
       <g class="hit" data-part="leaves">${leaves}</g>
     </g>
@@ -808,7 +850,19 @@ function attachTreeInteractions(t) {
   svg.querySelectorAll(".hit").forEach(el => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      const part = el.getAttribute("data-part");
+      let part = el.getAttribute("data-part");
+      const rectS = svg.getBoundingClientRect();
+      const localX = (e.clientX - rectS.left) / rectS.width * VW;
+      const localY = (e.clientY - rectS.top) / rectS.height * VH;
+      // 連続シルエットの幹は、タップ位置で 株/債券/股 を判定
+      if (part === "trunk") {
+        if (t.isFork) {
+          if (localY > t.forkY - 10) part = "base";        // 股より下＝合流部
+          else part = localX < CX ? "equity" : "bond";     // 左＝株, 右＝債券
+        } else {
+          part = "equity";
+        }
+      }
       const html = explain(part, t);
       if (!html) return;
       bubble.innerHTML = html;
