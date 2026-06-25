@@ -41,13 +41,32 @@
   }
   header.app p { margin: 0; color: var(--ink-soft); font-size: 13px; }
 
-  /* profile switcher */
+  /* developer-only profile switcher (ページ最下部) */
+  .dev-switcher {
+    margin-top: 40px;
+    padding: 20px;
+    border-top: 2px dashed #e0cfb0;
+    background: rgba(255, 250, 242, 0.6);
+    border-radius: 18px;
+    text-align: center;
+  }
+  .dev-switcher h2 {
+    margin: 0 0 4px;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+  }
+  .dev-switcher p {
+    margin: 0 0 4px;
+    font-size: 12px;
+    color: var(--ink-soft);
+  }
   .profiles {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     justify-content: center;
-    margin: 14px 0 18px;
+    margin: 14px 0 4px;
   }
   .profiles button {
     border: 2px solid transparent;
@@ -222,8 +241,6 @@
     <p>残高という数字の隣に、ポートフォリオの姿そのものを映した一本の木。形を見れば「長期・分散・年代に合ったリスク」が伝わる。</p>
   </header>
 
-  <div class="profiles" id="profiles"></div>
-
   <div class="layout">
     <div class="stage-card" id="stage">
       <div class="balance">
@@ -275,6 +292,12 @@
         </ul>
       </div>
     </div>
+  </div>
+
+  <div class="dev-switcher">
+    <h2>🛠 開発者用：プロフィール切り替え</h2>
+    <p>保有商品・積立期間・年齢がバラバラな5人を切り替えて、木の形の変化を確認できます。</p>
+    <div class="profiles" id="profiles"></div>
   </div>
 </div>
 
