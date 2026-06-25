@@ -542,14 +542,16 @@ function buildTree(t) {
     const lean = y => windLean * Math.pow(clamp((GROUND - y) / H, 0, 1), 1.25);
     const ew = Math.max(6, t.equityGirth);
     const bw = Math.max(6, t.bondGirth);
-    const baseW = Math.max(ew, bw) * 0.5 + (ew + bw) * 0.34; // 合流部（股の下）の太さ
-    const flare = baseW * 1.24;
     const forkY = baseY - H * 0.48;          // 股（合流点）の高さ＝下部はしっかり1本立つ
     t.isFork = true; t.forkY = forkY;
-    const spreadL = 40 + ew * 0.55;          // 太い枝ほど大きく広がる
-    const spreadR = 40 + bw * 0.55;
+    const spreadL = 30 + ew * 0.5;           // 太い枝ほど大きく広がる（やや上向き）
+    const spreadR = 30 + bw * 0.5;
     const wlTip = Math.max(2.5, ew * 0.16);
     const wrTip = Math.max(2.5, bw * 0.16);
+
+    // 幹の太さ：根元が最も太く（フレア）、分岐に向かって細くなる
+    const limbSum = ew + bw;
+    const baseHalf = Math.max(limbSum * 0.60, Math.max(ew, bw) * 1.05); // 根元の半幅＝最も太い
 
     const yTipL = baseY - H, yTipR = baseY - Hb;
     const LTx = CX - spreadL + lean(yTipL);  // 左（株）先端の中心
@@ -557,41 +559,49 @@ function buildTree(t) {
     const Cx = CX + lean(forkY);             // 股の谷の中心
     const valleyDip = 3;                      // 股の谷の丸み（浅め＝裂けて見えない）
 
-    // 高さ別の制御点 y
-    const yOL = baseY - H * 0.55,  yOL2 = baseY - H * 0.82;   // 左 外側
-    const yIL = baseY - H * 0.78,  yIL2 = forkY - H * 0.10;   // 左 内側
-    const yIR = forkY - Hb * 0.10, yIR2 = baseY - Hb * 0.78;  // 右 内側
-    const yOR2 = baseY - Hb * 0.82, yOR = baseY - Hb * 0.55;  // 右 外側
+    // 股での各枝の外側位置（枝は股で接して、合計が幹幅になる＝膨らまない）
+    const FLo = Cx - ew, FRo = Cx + bw;
+    const BLx = CX - baseHalf, BRx = CX + baseHalf;
 
-    const BLx = CX - flare / 2, BRx = CX + flare / 2;
-    const VL = Cx - 3, VR = Cx + 3, Vy = forkY + valleyDip;
+    // 制御点の高さ
+    const yLow = baseY - H * 0.20;            // 下部の幹（太いまま）
+    const yJB  = forkY + H * 0.07;            // 股のすぐ下
+    const yJA  = forkY - H * 0.05;            // 股のすぐ上（枝の付け根）
+    const yUpL = baseY - H * 0.80,  yUpR = baseY - Hb * 0.80;  // 先端近く 外側
+    const yInL = baseY - H * 0.74,  yInR = baseY - Hb * 0.74;  // 上部 内側
+
+    const LToX = LTx - wlTip / 2, RToX = RTx + wrTip / 2;       // 先端 外側
+    const LTiX = LTx + wlTip / 2, RTiX = RTx - wrTip / 2;       // 先端 内側
+    const VL = Cx - 2, VR = Cx + 2, Vy = forkY + valleyDip;
 
     const path =
       `M ${f1(BLx)} ${f1(baseY)} ` +
-      // 左枝 外側（根元 → 左先端の外側）
-      `C ${f1(CX - baseW * 0.55 + lean(yOL))} ${f1(yOL)}, ${f1(LTx - wlTip / 2 - 5 + lean(yOL2))} ${f1(yOL2)}, ${f1(LTx - wlTip / 2)} ${f1(yTipL)} ` +
+      // 下部の幹 左側（太い根元 → 股の外側へテーパー）
+      `C ${f1(CX - baseHalf * 0.98 + lean(yLow))} ${f1(yLow)}, ${f1(FLo + lean(yJB))} ${f1(yJB)}, ${f1(FLo + lean(forkY))} ${f1(forkY)} ` +
+      // 左枝 外側（股 → 左先端）
+      `C ${f1(FLo + lean(yJA))} ${f1(yJA)}, ${f1(LToX + 3 + lean(yUpL))} ${f1(yUpL)}, ${f1(LToX)} ${f1(yTipL)} ` +
       // 左先端のキャップ
-      `Q ${f1(LTx)} ${f1(yTipL - wlTip * 1.7)}, ${f1(LTx + wlTip / 2)} ${f1(yTipL)} ` +
+      `Q ${f1(LTx)} ${f1(yTipL - wlTip * 1.7)}, ${f1(LTiX)} ${f1(yTipL)} ` +
       // 左枝 内側（左先端 → 股の谷）
-      `C ${f1(LTx + wlTip / 2 + 3 + lean(yIL))} ${f1(yIL)}, ${f1(Cx - ew * 0.34 + lean(yIL2))} ${f1(yIL2)}, ${f1(VL)} ${f1(Vy)} ` +
+      `C ${f1(LTiX - 3 + lean(yInL))} ${f1(yInL)}, ${f1(Cx - ew * 0.28 + lean(yJA))} ${f1(yJA)}, ${f1(VL)} ${f1(Vy)} ` +
       // 股の谷（やわらかいU字）
       `Q ${f1(Cx)} ${f1(Vy + 3)}, ${f1(VR)} ${f1(Vy)} ` +
       // 右枝 内側（股の谷 → 右先端）
-      `C ${f1(Cx + bw * 0.34 + lean(yIR))} ${f1(yIR)}, ${f1(RTx - wrTip / 2 - 3 + lean(yIR2))} ${f1(yIR2)}, ${f1(RTx - wrTip / 2)} ${f1(yTipR)} ` +
+      `C ${f1(Cx + bw * 0.28 + lean(yJA))} ${f1(yJA)}, ${f1(RTiX + 3 + lean(yInR))} ${f1(yInR)}, ${f1(RTiX)} ${f1(yTipR)} ` +
       // 右先端のキャップ
-      `Q ${f1(RTx)} ${f1(yTipR - wrTip * 1.7)}, ${f1(RTx + wrTip / 2)} ${f1(yTipR)} ` +
-      // 右枝 外側（右先端 → 根元）
-      `C ${f1(RTx + wrTip / 2 + 5 + lean(yOR2))} ${f1(yOR2)}, ${f1(CX + baseW * 0.55 + lean(yOR))} ${f1(yOR)}, ${f1(BRx)} ${f1(baseY)} Z`;
+      `Q ${f1(RTx)} ${f1(yTipR - wrTip * 1.7)}, ${f1(RToX)} ${f1(yTipR)} ` +
+      // 右枝 外側（右先端 → 股）
+      `C ${f1(RToX - 3 + lean(yUpR))} ${f1(yUpR)}, ${f1(FRo + lean(yJA))} ${f1(yJA)}, ${f1(FRo + lean(forkY))} ${f1(forkY)} ` +
+      // 下部の幹 右側（股の外側 → 太い根元）
+      `C ${f1(FRo + lean(yJB))} ${f1(yJB)}, ${f1(CX + baseHalf * 0.98 + lean(yLow))} ${f1(yLow)}, ${f1(BRx)} ${f1(baseY)} Z`;
 
     // 左右で株（緑みの茶）→債券（明るい茶）に滑らかに変わる横グラデーション
     trunkSVG += `<path class="hit" data-part="trunk" d="${path}" fill="url(#barkFork)" ${trunkStroke}/>`;
 
     // 股の内側に落ちる影（奥行き）
-    trunkSVG += `<path d="M ${f1(Cx - ew*0.30 + lean(forkY))} ${f1(forkY - H*0.06)} Q ${f1(Cx)} ${f1(Vy + 2)}, ${f1(Cx + bw*0.30 + lean(forkY))} ${f1(forkY - Hb*0.06)}" stroke="#5e4228" stroke-width="3" stroke-opacity="0.22" fill="none" stroke-linecap="round"/>`;
-    // 各枝に沿う樹皮の陰影ライン（下〜中部のみ・ごく控えめ）
-    const yMidL = baseY - H * 0.58, yMidR = baseY - Hb * 0.58;
-    trunkSVG += `<path d="M ${f1(CX - baseW*0.16 + lean(baseY - H*0.16))} ${f1(baseY - H*0.16)} Q ${f1((Cx+LTx)/2 - ew*0.1 + lean(yIL))} ${f1(yIL)}, ${f1((Cx+LTx)/2 + lean(yMidL))} ${f1(yMidL)}" stroke="#6b4a2c" stroke-width="${Math.max(1, ew*0.07)}" stroke-opacity="0.12" fill="none" stroke-linecap="round"/>`;
-    trunkSVG += `<path d="M ${f1(CX + baseW*0.16 + lean(baseY - Hb*0.16))} ${f1(baseY - Hb*0.16)} Q ${f1((Cx+RTx)/2 + bw*0.1 + lean(yIR2))} ${f1(yIR2)}, ${f1((Cx+RTx)/2 + lean(yMidR))} ${f1(yMidR)}" stroke="#6b4a2c" stroke-width="${Math.max(1, bw*0.07)}" stroke-opacity="0.12" fill="none" stroke-linecap="round"/>`;
+    trunkSVG += `<path d="M ${f1(Cx - ew*0.28 + lean(yJA))} ${f1(yJA)} Q ${f1(Cx)} ${f1(Vy + 2)}, ${f1(Cx + bw*0.28 + lean(yJA))} ${f1(yJA)}" stroke="#5e4228" stroke-width="3" stroke-opacity="0.20" fill="none" stroke-linecap="round"/>`;
+    // 下部の幹に沿う樹皮の陰影ライン（ごく控えめ）
+    trunkSVG += `<path d="M ${f1(CX - baseHalf*0.22 + lean(baseY - H*0.16))} ${f1(baseY - H*0.16)} Q ${f1(CX - baseHalf*0.10 + lean(yLow))} ${f1(yLow)}, ${f1(Cx - ew*0.4 + lean(yJB))} ${f1(yJB)}" stroke="#6b4a2c" stroke-width="${Math.max(1, baseHalf*0.06)}" stroke-opacity="0.13" fill="none" stroke-linecap="round"/>`;
 
     // 左（株）の樹冠
     const crL = 24 + ew * 0.85 + lush * 12;
