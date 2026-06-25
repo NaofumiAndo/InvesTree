@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>育てる木 — ポートフォリオの木 プロトタイプ</title>
+<style>
+  :root {
+    --sky-top: #cdeafe;
+    --sky-bot: #fde8d4;
+    --ground: #e9d3b0;
+    --ground-dk: #d8b98a;
+    --ink: #5b4a3a;
+    --ink-soft: #8a7560;
+    --card: #fffaf2;
+    --accent: #6fae6a;
+    --accent-dk: #4f8a52;
+    --shadow: rgba(120, 95, 60, 0.18);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: #f6efe2;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 18px 60px;
+  }
+  header.app {
+    text-align: center;
+    margin-bottom: 14px;
+  }
+  header.app h1 {
+    margin: 4px 0 2px;
+    font-size: 26px;
+    letter-spacing: 0.06em;
+  }
+  header.app p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+
+  /* profile switcher */
+  .profiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 14px 0 18px;
+  }
+  .profiles button {
+    border: 2px solid transparent;
+    background: var(--card);
+    color: var(--ink);
+    border-radius: 16px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px var(--shadow);
+    transition: transform .12s ease, border-color .12s ease;
+    font-family: inherit;
+  }
+  .profiles button .emoji { font-size: 16px; margin-right: 4px; }
+  .profiles button:hover { transform: translateY(-2px); }
+  .profiles button.active {
+    border-color: var(--accent);
+    background: #eef7ea;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(320px, 1fr) 340px;
+    gap: 20px;
+    align-items: start;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .stage-card {
+    background: linear-gradient(180deg, var(--sky-top) 0%, #e7f4e9 62%, var(--sky-bot) 100%);
+    border-radius: 24px;
+    box-shadow: 0 8px 24px var(--shadow);
+    overflow: hidden;
+    position: relative;
+  }
+  .balance {
+    position: absolute;
+    top: 16px;
+    left: 20px;
+    z-index: 3;
+    background: rgba(255,255,255,0.72);
+    backdrop-filter: blur(3px);
+    border-radius: 16px;
+    padding: 8px 14px;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .balance .who { font-size: 12px; color: var(--ink-soft); }
+  .balance .amt { font-size: 24px; font-weight: 700; letter-spacing: 0.02em; }
+  .balance .delta { font-size: 12px; color: var(--accent-dk); font-weight: 600; }
+  .tree-hint {
+    position: absolute;
+    bottom: 12px;
+    width: 100%;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-soft);
+    z-index: 3;
+    pointer-events: none;
+  }
+  svg.tree { display: block; width: 100%; height: auto; cursor: pointer; }
+  .hit { cursor: pointer; }
+
+  /* tooltip bubble */
+  .bubble {
+    position: absolute;
+    z-index: 5;
+    max-width: 220px;
+    background: #fffdf8;
+    border: 2px solid #ead9bd;
+    border-radius: 14px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    box-shadow: 0 6px 18px var(--shadow);
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity .15s ease, transform .15s ease;
+    pointer-events: none;
+  }
+  .bubble.show { opacity: 1; transform: translateY(0); }
+  .bubble b { color: var(--accent-dk); }
+
+  /* side panel */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .box {
+    background: var(--card);
+    border-radius: 18px;
+    padding: 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+  }
+  .box h2 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    text-transform: none;
+  }
+  .holding {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    border-bottom: 1px dashed #ecdfc8;
+    font-size: 13px;
+  }
+  .holding:last-child { border-bottom: none; }
+  .holding .nm { display: flex; align-items: center; gap: 7px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .dot.equity { background: #6fae6a; }
+  .dot.bond { background: #c79a5b; }
+  .dot.other { background: #d98ba8; }
+  .holding .amt2 { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
+  .metric { font-size: 12px; }
+  .metric .lab { color: var(--ink-soft); }
+  .metric .val { font-size: 15px; font-weight: 700; }
+  .wind-badge { font-weight: 700; }
+
+  .sliders label {
+    display: block;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 10px 0 2px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .sliders label span.v { color: var(--ink); font-weight: 700; }
+  .sliders input[type=range] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .learnings { font-size: 12.5px; line-height: 1.6; }
+  .learnings li { margin-bottom: 6px; }
+  .reset-btn {
+    margin-top: 10px;
+    width: 100%;
+    border: none;
+    background: #eef7ea;
+    color: var(--accent-dk);
+    border-radius: 12px;
+    padding: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+  }
+  .tag-custom {
+    display: inline-block;
+    font-size: 11px;
+    background: #ffe9c7;
+    color: #b3792a;
+    border-radius: 8px;
+    padding: 2px 8px;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="app">
+    <h1>🌳 育てる木</h1>
+    <p>残高という数字の隣に、ポートフォリオの姿そのものを映した一本の木。形を見れば「長期・分散・年代に合ったリスク」が伝わる。</p>
+  </header>
+
+  <div class="profiles" id="profiles"></div>
+
+  <div class="layout">
+    <div class="stage-card" id="stage">
+      <div class="balance">
+        <div class="who" id="who"></div>
+        <div class="amt" id="amt"></div>
+        <div class="delta" id="delta"></div>
+      </div>
+      <div id="treeHost"></div>
+      <div class="bubble" id="bubble"></div>
+      <div class="tree-hint">木の各パーツをタップすると、やさしい解説が出ます 🍃</div>
+    </div>
+
+    <div class="panel">
+      <div class="box">
+        <h2>保有商品 <span id="customTag"></span></h2>
+        <div id="holdings"></div>
+      </div>
+
+      <div class="box">
+        <h2>この木が表していること</h2>
+        <div class="metrics" id="metrics"></div>
+      </div>
+
+      <div class="box sliders">
+        <h2>パラメータをいじって形の変化を見る</h2>
+        <label>年齢 <span class="v" id="vAge"></span></label>
+        <input type="range" id="sAge" min="20" max="80" step="1">
+        <label>積立継続年数 <span class="v" id="vYears"></span></label>
+        <input type="range" id="sYears" min="0" max="40" step="0.5">
+        <label>株式の分散度（実質銘柄数） <span class="v" id="vDiv"></span></label>
+        <input type="range" id="sDiv" min="0" max="3.5" step="0.05">
+        <label>株式の量 <span class="v" id="vEq"></span></label>
+        <input type="range" id="sEq" min="0" max="100" step="1">
+        <label>債券の量 <span class="v" id="vBond"></span></label>
+        <input type="range" id="sBond" min="0" max="100" step="1">
+        <label>その他資産の量（REIT・金・暗号資産等） <span class="v" id="vOther"></span></label>
+        <input type="range" id="sOther" min="0" max="100" step="1">
+        <label>現金・生活防衛資金（根の深さ） <span class="v" id="vCash"></span></label>
+        <input type="range" id="sCash" min="0" max="100" step="1">
+        <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
+      </div>
+
+      <div class="box">
+        <h2>木が伝える3つの学び</h2>
+        <ul class="learnings">
+          <li>🌱 <b>長期積立</b> … 続けるほど木は高く育つ（樹高＝継続年数）</li>
+          <li>🪵 <b>分散</b> … 1銘柄集中は細くひょろり、分散はどっしり太い幹</li>
+          <li>🍃 <b>年代別リバランス</b> … 年齢に対し株が過剰だと暴風。債券の幹が育つと二股で踏ん張れる</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   データモデル（最小入力で木が決まる） — §6
+   amount は円。distinctSecurities は実質銘柄数（分散の目安）。
+   ========================================================================= */
+const TODAY = new Date("2026-06-25");
+
+const PROFILES = [
+  {
+    id: "young",
+    emoji: "🌱",
+    label: "若者・オルカンのみ",
+    name: "ひな（24歳）",
+    note: "つみたて2年目",
+    age: 24,
+    start: "2024-04-01",
+    holdings: [
+      { name: "eMAXIS Slim 全世界株式（オルカン）", assetClass: "equity", amount: 600000, distinctSecurities: 3000 },
+    ],
+    cash: 200000,
+  },
+  {
+    id: "elder",
+    emoji: "🍂",
+    label: "高齢者・トヨタ持株会のみ",
+    name: "鉄三（68歳）",
+    note: "持株会ひとすじ36年",
+    age: 68,
+    start: "1990-04-01",
+    holdings: [
+      { name: "トヨタ自動車（持株会）", assetClass: "equity", amount: 5000000, distinctSecurities: 1 },
+    ],
+    cash: 400000,
+  },
+  {
+    id: "growing",
+    emoji: "🌳",
+    label: "育成中バランス型",
+    name: "美咲（38歳）",
+    note: "つみたて9年目",
+    age: 38,
+    start: "2017-04-01",
+    holdings: [
+      { name: "全世界株式インデックス", assetClass: "equity", amount: 3200000, distinctSecurities: 3000 },
+      { name: "自社株（持株会）", assetClass: "equity", amount: 800000, distinctSecurities: 1 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 1500000, distinctSecurities: 800 },
+      { name: "J-REIT", assetClass: "other", amount: 300000, distinctSecurities: 50 },
+    ],
+    cash: 600000,
+  },
+  {
+    id: "ideal",
+    emoji: "🌲",
+    label: "退職前・理想バランス",
+    name: "健司（60歳）",
+    note: "つみたて31年・株債50:50",
+    age: 60,
+    start: "1995-04-01",
+    holdings: [
+      { name: "全世界株式インデックス", assetClass: "equity", amount: 4800000, distinctSecurities: 3000 },
+      { name: "国内株式インデックス", assetClass: "equity", amount: 1200000, distinctSecurities: 400 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 4000000, distinctSecurities: 1000 },
+      { name: "国内債券インデックス", assetClass: "bond", amount: 2000000, distinctSecurities: 300 },
+      { name: "純金上場信託", assetClass: "other", amount: 500000, distinctSecurities: 1 },
+    ],
+    cash: 3000000,
+  },
+  {
+    id: "crypto",
+    emoji: "🪙",
+    label: "暗号資産偏重・頭でっかち",
+    name: "涼太（32歳）",
+    note: "つみたて5年・その他が大半",
+    age: 32,
+    start: "2021-06-01",
+    holdings: [
+      { name: "ビットコイン", assetClass: "other", amount: 3200000, distinctSecurities: 1 },
+      { name: "イーサリアム", assetClass: "other", amount: 800000, distinctSecurities: 1 },
+      { name: "個別株（数銘柄）", assetClass: "equity", amount: 1000000, distinctSecurities: 5 },
+    ],
+    cash: 100000,
+  },
+];
+
+/* =========================================================================
+   モデル → 木のパラメータ（§3, §6 の対応表に基づく派生）
+   ========================================================================= */
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function yearsFrom(dateStr) {
+  return (TODAY - new Date(dateStr)) / (365.25 * 24 * 3600 * 1000);
+}
+
+/** 保有商品 → スライダーが操作する生の状態へ */
+function profileToState(p) {
+  let eq = 0, bd = 0, ot = 0;
+  // 株式内の分散スコア：金額加重の log10(実質銘柄数)。1銘柄=0、3000銘柄≈3.48
+  let eqWeighted = 0;
+  for (const h of p.holdings) {
+    if (h.assetClass === "equity") { eq += h.amount; eqWeighted += h.amount * Math.log10(Math.max(1, h.distinctSecurities)); }
+    else if (h.assetClass === "bond") bd += h.amount;
+    else ot += h.amount;
+  }
+  const divScore = eq > 0 ? eqWeighted / eq : 0;
+  return {
+    age: p.age,
+    years: Math.max(0, yearsFrom(p.start)),
+    divScore: divScore,
+    equity: eq,
+    bond: bd,
+    other: ot,
+    cash: p.cash || 0,
+  };
+}
+
+/** 生の状態 → 描画パラメータ */
+function deriveTree(s) {
+  const total = s.equity + s.bond + s.other;
+  const sb = s.equity + s.bond;
+  // 樹高：継続年数で飽和的に成長（芽→若木→大樹）
+  const H = 60 + 300 * (1 - Math.exp(-s.years / 11));
+  const heightFactor = 0.55 + 0.45 * (H / 360);
+
+  // 株の幹の太さ＝分散度（divScore 0..3.5）。1銘柄=葦のように細い
+  const equityGirth = (5 + (clamp(s.divScore, 0, 3.5) / 3.5) * 44) * heightFactor;
+
+  // 債券の幹：量に応じて木質化（分散資産なので素直に太い）
+  const bondShareSB = sb > 0 ? s.bond / sb : 0;
+  const bondGirth = Math.min(50, 100 * bondShareSB) * heightFactor; // 50:50で株と並ぶ太さ
+  const forkRatio = bondShareSB; // 0=1本幹, 0.5=対称
+
+  // 風＝年齢相応リスクとのズレ（§3-3）
+  const target = clamp(110 - s.age, 20, 90);
+  const equityPctSB = sb > 0 ? (s.equity / sb) * 100 : 0;
+  const gap = sb > 0 ? equityPctSB - target : 0;
+  // 小さなズレ(±10%程度)は許容しそよ風。それを超えて株が過剰なほど強風に。
+  const wind = clamp((gap - 10) / 70, 0, 1);
+
+  // その他＝小枝
+  const otherShare = total > 0 ? s.other / total : 0;
+
+  // 根＝現金比率
+  const rootDepth = (total + s.cash) > 0 ? s.cash / (total + s.cash) : 0;
+
+  return {
+    H, heightFactor, equityGirth, bondGirth, forkRatio,
+    wind, gap, target, equityPctSB, otherShare, rootDepth,
+    total, equity: s.equity, bond: s.bond, other: s.other,
+  };
+}
+
+/* =========================================================================
+   パラメトリックな木の描画（SVG） — §8 procedural
+   ========================================================================= */
+const VW = 480, VH = 600, GROUND = 472, CX = 240;
+
+function ribbon(x0, y0, w0, x1, y1, w1, c1x, c1y, c2x, c2y) {
+  const wm = (w0 + w1) / 2;
+  return `M ${x0 - w0/2} ${y0} `
+    + `C ${c1x - wm/2} ${c1y}, ${c2x - w1/2} ${c2y}, ${x1 - w1/2} ${y1} `
+    + `L ${x1 + w1/2} ${y1} `
+    + `C ${c2x + w1/2} ${c2y}, ${c1x + wm/2} ${c1y}, ${x0 + w0/2} ${y0} Z`;
+}
+
+function leafCluster(cx, cy, r, hue) {
+  // 重なる楕円で柔らかい水彩風の葉群
+  const blobs = [
+    [0, 0, 1], [-0.55, 0.1, 0.8], [0.55, 0.12, 0.8],
+    [-0.3, -0.5, 0.78], [0.3, -0.52, 0.78], [0, -0.85, 0.62],
+    [-0.7, -0.35, 0.55], [0.7, -0.33, 0.55],
+  ];
+  let s = "";
+  for (const [dx, dy, k] of blobs) {
+    s += `<ellipse cx="${cx + dx*r}" cy="${cy + dy*r}" rx="${r*k}" ry="${r*k*0.86}" fill="${hue}"/>`;
+  }
+  return s;
+}
+
+function twig(x0, y0, ang, len, sway) {
+  const x1 = x0 + Math.cos(ang) * len + sway;
+  const y1 = y0 - Math.sin(ang) * len;
+  const cx = x0 + Math.cos(ang) * len * 0.5 + sway * 0.4;
+  const cy = y0 - Math.sin(ang) * len * 0.5;
+  return { x1, y1, path: `M ${x0} ${y0} Q ${cx} ${cy} ${x1} ${y1}` };
+}
+
+function buildTree(t) {
+  const wind = t.wind;
+  const windLean = wind * 64;          // 風による静的な傾き（先端変位 px）
+  const swayAmp = (0.5 + wind * 4.2).toFixed(2); // 揺れ角度
+  const swayDur = (4.4 - wind * 2.2).toFixed(2);  // 強風ほど速い
+
+  // 葉の量感（評価額・継続で青々）
+  const lush = clamp(t.H / 360, 0.25, 1);
+  const greenMain = wind > 0.55 ? "#8fae7a" : "#79b46f"; // 暴風は少しくすむ
+  const greenDk = "#5e9a59";
+
+  let parts = []; // {id, path, attrs}
+  let leaves = "";
+  let twigs = "";
+
+  const baseY = GROUND;
+
+  if (t.forkRatio <= 0.02) {
+    /* ----- 1本幹（株式100%）----- */
+    const H = t.H;
+    const w0 = Math.max(5, t.equityGirth);
+    const w1 = Math.max(2, w0 * 0.22);
+    const topX = CX + windLean;
+    const topY = baseY - H;
+    const c1x = CX + windLean * 0.30, c1y = baseY - H * 0.45;
+    const c2x = CX + windLean * 0.75, c2y = baseY - H * 0.80;
+    const path = ribbon(CX, baseY, w0, topX, topY, w1, c1x, c1y, c2x, c2y);
+    parts.push({ id: "equity", path, fill: "url(#barkE)" });
+    const cr = 26 + w0 * 0.9 + lush * 14;
+    leaves += leafCluster(topX, topY - cr * 0.2, cr, greenMain);
+    leaves += leafCluster(topX - cr*0.5, topY + cr*0.2, cr*0.6, greenDk);
+    // その他の小枝（1本幹の上部から）
+    twigs += buildTwigs(t, c2x, c2y, topX, topY, windLean);
+  } else {
+    /* ----- 二股（株 + 債券）----- */
+    const H = t.H;
+    const forkH = H * 0.30;
+    const forkY = baseY - forkH;
+    const ew = Math.max(5, t.equityGirth);
+    const bw = Math.max(5, t.bondGirth);
+    const baseW = (ew + bw) * 0.62;
+    // 共有の下部幹
+    const sc1x = CX + windLean * 0.12, sc1y = baseY - forkH * 0.5;
+    parts.push({
+      id: "base",
+      path: ribbon(CX, baseY, baseW, CX + windLean * 0.18, forkY, (ew + bw) * 0.5, sc1x, sc1y, CX + windLean * 0.18, forkY + 4),
+      fill: "url(#barkB)"
+    });
+    const spread = 66;
+    // 株の幹（左に伸びる）
+    {
+      const topX = CX - spread + windLean;
+      const topY = baseY - H;
+      const w1 = Math.max(2, ew * 0.22);
+      const c1x = CX - spread*0.5 + windLean*0.3, c1y = forkY - (H-forkH)*0.45;
+      const c2x = topX, c2y = baseY - H*0.82;
+      parts.push({ id: "equity", path: ribbon(CX + windLean*0.18, forkY, ew, topX, topY, w1, c1x, c1y, c2x, c2y), fill: "url(#barkE)" });
+      const cr = 24 + ew * 0.85 + lush * 12;
+      leaves += leafCluster(topX, topY - cr*0.15, cr, greenMain);
+      leaves += leafCluster(topX - cr*0.45, topY + cr*0.25, cr*0.55, greenDk);
+      twigs += buildTwigs(t, c1x, c1y, topX, topY, windLean);
+    }
+    // 債券の幹（右に伸びる、株より少し低め）
+    {
+      const Hb = H * 0.92;
+      const topX = CX + spread + windLean;
+      const topY = baseY - Hb;
+      const w1 = Math.max(2, bw * 0.22);
+      const c1x = CX + spread*0.5 + windLean*0.3, c1y = forkY - (Hb-forkH)*0.45;
+      const c2x = topX, c2y = baseY - Hb*0.82;
+      parts.push({ id: "bond", path: ribbon(CX + windLean*0.18, forkY, bw, topX, topY, w1, c1x, c1y, c2x, c2y), fill: "url(#barkBond)" });
+      const cr = 24 + bw * 0.8 + lush * 10;
+      leaves += leafCluster(topX, topY - cr*0.15, cr, "#7bbf86"); // 債券側は少し青みの緑
+      leaves += leafCluster(topX + cr*0.45, topY + cr*0.25, cr*0.55, "#5aa06a");
+    }
+  }
+
+  // 根（現金）
+  const rootDepth = t.rootDepth;
+  const rootLen = 18 + rootDepth * 90;
+  let roots = "";
+  const rootAngs = [200, 230, 270, 310, 340];
+  for (let i = 0; i < rootAngs.length; i++) {
+    const a = rootAngs[i] * Math.PI / 180;
+    const len = rootLen * (0.6 + ((i % 2) ? 0.4 : 0.25));
+    const x1 = CX + Math.cos(a) * len * 0.7;
+    const y1 = GROUND - Math.sin(a) * len; // sin負→下向き
+    const cx = CX + Math.cos(a) * len * 0.35;
+    const cy = GROUND - Math.sin(a) * len * 0.4;
+    roots += `<path d="M ${CX} ${GROUND-2} Q ${cx} ${cy} ${x1} ${y1}" stroke="#b98f5e" stroke-width="${3 + rootDepth*5}" fill="none" stroke-linecap="round" opacity="0.85"/>`;
+  }
+
+  // 風のガスト線（強風時）
+  let gust = "";
+  if (wind > 0.35) {
+    const n = Math.round(wind * 5);
+    for (let i = 0; i < n; i++) {
+      const gy = 120 + i * 60;
+      gust += `<path class="gust" d="M 20 ${gy} q 40 -10 90 -4 t 120 -2" stroke="#ffffff" stroke-width="2" fill="none" opacity="0.45" stroke-linecap="round" style="animation-delay:${i*0.4}s"/>`;
+    }
+  }
+
+  // 組み立て
+  const trunkPaths = parts.map(p =>
+    `<path class="hit" data-part="${p.id}" d="${p.path}" fill="${p.fill}" stroke="#6b4f33" stroke-width="1" stroke-opacity="0.25"/>`
+  ).join("");
+
+  const svg = `
+  <svg class="tree" viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" style="--amp:${swayAmp}deg; --dur:${swayDur}s;">
+    <defs>
+      <linearGradient id="barkE" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#9a6f43"/><stop offset="1" stop-color="#b98a57"/>
+      </linearGradient>
+      <linearGradient id="barkB" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#8c6438"/><stop offset="1" stop-color="#a87b4c"/>
+      </linearGradient>
+      <linearGradient id="barkBond" x1="0" y1="1" x2="0" y2="0">
+        <stop offset="0" stop-color="#a9854f"/><stop offset="1" stop-color="#c6a36a"/>
+      </linearGradient>
+      <radialGradient id="sun" cx="0.82" cy="0.16" r="0.3">
+        <stop offset="0" stop-color="#fff6da"/><stop offset="1" stop-color="#fff6da" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+
+    <rect x="0" y="0" width="${VW}" height="${VH}" fill="url(#sun)"/>
+    <circle cx="394" cy="74" r="34" fill="#ffe9a8" opacity="0.85"/>
+
+    ${gust}
+
+    <!-- 地面 -->
+    <path d="M 0 ${GROUND} Q ${CX} ${GROUND-26} ${VW} ${GROUND} L ${VW} ${VH} L 0 ${VH} Z" fill="var(--ground)"/>
+    <path d="M 0 ${GROUND} Q ${CX} ${GROUND-26} ${VW} ${GROUND}" stroke="var(--ground-dk)" stroke-width="3" fill="none" opacity="0.5"/>
+
+    <!-- 根 -->
+    <g class="hit" data-part="roots">${roots}</g>
+
+    <!-- 木の影 -->
+    <ellipse cx="${CX+10}" cy="${GROUND+10}" rx="${90 + t.H*0.1}" ry="14" fill="rgba(90,70,40,0.16)"/>
+
+    <!-- 揺れるグループ（幹＋枝＋葉） -->
+    <g class="sway" style="transform-origin:${CX}px ${GROUND}px;">
+      ${trunkPaths}
+      <g class="hit" data-part="branches">${twigs}</g>
+      <g class="hit" data-part="leaves">${leaves}</g>
+    </g>
+  </svg>`;
+  return svg;
+}
+
+function buildTwigs(t, fromX, fromY, topX, topY, windLean) {
+  const share = t.otherShare;
+  if (share <= 0.001) return "";
+  const n = clamp(Math.round(share * 18), 1, 10);
+  const colors = ["#e6a4c0", "#f4c95d", "#c79be0", "#e88f6f"]; // 花・実の彩り
+  let s = "";
+  for (let i = 0; i < n; i++) {
+    const f = i / Math.max(1, n - 1);
+    // その他が過大なら上部に集中して「頭でっかち」に
+    const ax = topX + (fromX - topX) * (share > 0.5 ? f * 0.35 : f);
+    const ay = topY + (fromY - topY) * (share > 0.5 ? f * 0.35 : f);
+    const dir = i % 2 === 0 ? 1 : -1;
+    const ang = (Math.PI/2) + dir * (0.5 + 0.5 * Math.random()) ;
+    const len = 24 + share * 52;
+    const tg = twig(ax, ay, ang, len, windLean * 0.6 * f);
+    s += `<path d="${tg.path}" stroke="#8a6b46" stroke-width="${1.6 + share}" fill="none" stroke-linecap="round"/>`;
+    const c = colors[i % colors.length];
+    s += `<circle cx="${tg.x1}" cy="${tg.y1}" r="${4 + share*6}" fill="${c}"/>`;
+  }
+  return s;
+}
+
+/* =========================================================================
+   タップ解説（§5）— 状態に応じて文面を動的生成
+   ========================================================================= */
+function explain(part, t) {
+  const yen = v => "約" + Math.round(v/10000).toLocaleString() + "万円";
+  switch (part) {
+    case "equity": {
+      if (t.equityGirth < 16)
+        return `<b>株式の幹（細い）</b><br>1銘柄に集中しているので、木質化せず頼りない幹です。風に弱く折れそう。投信やインデックスで分散すると、どっしり太く育ちます。`;
+      return `<b>株式の幹（太い）</b><br>たくさんの銘柄に分散しているので、しっかり木質化した安定した幹です。多少の風ではびくともしません。`;
+    }
+    case "bond":
+      return `<b>債券の幹</b><br>債券（${yen(t.bond)}）を組み入れると、根元から2本目の幹が育ちます。株の幹と支え合って自立し、重心が下がって風に強くなります。`;
+    case "base":
+      return `<b>二股の付け根</b><br>株と債券、2つの資産クラスがここで支え合っています。左右の太さの比率が、ほぼ半々になると一番安定して美しく見えます。`;
+    case "branches":
+      return t.otherShare > 0.5
+        ? `<b>小枝（その他資産が過大）</b><br>REITや暗号資産などが大半で、枝ばかり茂って幹がスカスカ。頭でっかちで不安定です。主構造（幹）を太らせましょう。`
+        : `<b>小枝・彩り</b><br>REITや金などの「その他資産」。花や実のように彩りを添えますが、主構造（幹）は支えません。少量がちょうどよい塩梅です。`;
+    case "leaves":
+      return `<b>葉の茂り</b><br>評価額や含み益のあらわれ。続けるほど青々と茂ります。下落局面でも色が少しくすむ程度に留めます。`;
+    case "roots":
+      return t.rootDepth > 0.15
+        ? `<b>根（深い）</b><br>現金・生活防衛資金がしっかり。深い根は強風や干ばつ（暴落）に耐える土台です。安心して投資を続けられます。`
+        : `<b>根（浅い）</b><br>現金のクッションが少なめ。根が浅いと倒れやすいので、生活防衛資金を少し厚くすると木が安定します。`;
+    default:
+      return "";
+  }
+}
+
+function windLabel(wind, gap) {
+  if (wind < 0.12) return { txt: "そよ風 🍃", color: "#4f8a52" };
+  if (wind < 0.4)  return { txt: "やや強い風 🌬️", color: "#c79a3a" };
+  return { txt: "暴風 🌪️", color: "#cf6a4a" };
+}
+
+/* =========================================================================
+   アプリ状態と描画
+   ========================================================================= */
+let activeId = PROFILES[0].id;
+let state = profileToState(PROFILES[0]);
+let custom = false;
+
+const $ = id => document.getElementById(id);
+
+function renderProfiles() {
+  const host = $("profiles");
+  host.innerHTML = "";
+  for (const p of PROFILES) {
+    const b = document.createElement("button");
+    b.className = "profile-btn" + (p.id === activeId ? " active" : "");
+    b.innerHTML = `<span class="emoji">${p.emoji}</span>${p.label}`;
+    b.onclick = () => { selectProfile(p.id); };
+    host.appendChild(b);
+  }
+}
+
+function selectProfile(id) {
+  activeId = id;
+  const p = PROFILES.find(x => x.id === id);
+  state = profileToState(p);
+  custom = false;
+  syncSliders();
+  renderAll();
+}
+
+function currentProfile() { return PROFILES.find(x => x.id === activeId); }
+
+function syncSliders() {
+  $("sAge").value = state.age;
+  $("sYears").value = state.years.toFixed(1);
+  $("sDiv").value = state.divScore.toFixed(2);
+  // 量は万円スケールに丸めてスライダーに反映（0-100目盛り）
+  $("sEq").value = Math.round(state.equity / 100000);
+  $("sBond").value = Math.round(state.bond / 100000);
+  $("sOther").value = Math.round(state.other / 100000);
+  $("sCash").value = Math.round(state.cash / 100000);
+}
+
+function readSliders() {
+  state = {
+    age: +$("sAge").value,
+    years: +$("sYears").value,
+    divScore: +$("sDiv").value,
+    equity: +$("sEq").value * 100000,
+    bond: +$("sBond").value * 100000,
+    other: +$("sOther").value * 100000,
+    cash: +$("sCash").value * 100000,
+  };
+  custom = true;
+  renderAll();
+}
+
+function renderHoldings(t) {
+  const p = currentProfile();
+  const host = $("holdings");
+  if (custom) {
+    const rows = [
+      ["株式", "equity", state.equity],
+      ["債券", "bond", state.bond],
+      ["その他資産", "other", state.other],
+      ["現金", "other", state.cash],
+    ];
+    host.innerHTML = rows.map(([nm, cls, amt]) =>
+      `<div class="holding"><div class="nm"><span class="dot ${cls}"></span>${nm}</div><div class="amt2">${(amt/10000).toLocaleString()}万円</div></div>`
+    ).join("");
+    return;
+  }
+  host.innerHTML = p.holdings.map(h =>
+    `<div class="holding"><div class="nm"><span class="dot ${h.assetClass}"></span>${h.name}</div><div class="amt2">${(h.amount/10000).toLocaleString()}万円</div></div>`
+  ).join("")
+  + `<div class="holding"><div class="nm"><span class="dot other" style="background:#bcbcbc"></span>現金（生活防衛資金）</div><div class="amt2">${(p.cash/10000).toLocaleString()}万円</div></div>`;
+}
+
+function renderMetrics(t) {
+  const w = windLabel(t.wind, t.gap);
+  const girthTxt = t.equityGirth < 16 ? "細い（集中）" : t.equityGirth < 34 ? "ふつう" : "太い（分散）";
+  const forkTxt = t.forkRatio < 0.02 ? "1本幹（株100%）"
+    : Math.abs(t.forkRatio - 0.5) < 0.08 ? "ほぼ対称（理想）" : "二股";
+  const m = [
+    ["積立年数（樹高）", state.years.toFixed(1) + " 年"],
+    ["株式の分散（幹の太さ）", girthTxt],
+    ["株:債の幹", forkTxt],
+    ["推奨株式比率(target)", Math.round(t.target) + " %"],
+    ["実際の株式比率", t.equity + t.bond > 0 ? Math.round(t.equityPctSB) + " %" : "—"],
+    ["ズレ(gap)→風", `<span class="wind-badge" style="color:${w.color}">${w.txt}</span>`],
+  ];
+  $("metrics").innerHTML = m.map(([l, v]) =>
+    `<div class="metric"><div class="lab">${l}</div><div class="val">${v}</div></div>`
+  ).join("");
+}
+
+function renderBalance(t) {
+  const p = currentProfile();
+  const total = state.equity + state.bond + state.other;
+  $("who").textContent = custom ? "カスタム設定" : `${p.name}・${p.note}`;
+  $("amt").textContent = "¥" + total.toLocaleString();
+  // 擬似的な前日比（葉の色イメージ）
+  const delta = (total * 0.0042);
+  $("delta").textContent = `前日比 +¥${Math.round(delta).toLocaleString()} (+0.42%)`;
+  $("customTag").innerHTML = custom ? `<span class="tag-custom">カスタム編集中</span>` : "";
+}
+
+function attachTreeInteractions(t) {
+  const bubble = $("bubble");
+  const stage = $("stage");
+  const svg = stage.querySelector("svg.tree");
+  svg.querySelectorAll(".hit").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const part = el.getAttribute("data-part");
+      const html = explain(part, t);
+      if (!html) return;
+      bubble.innerHTML = html;
+      // バブルを表示位置へ
+      const rect = stage.getBoundingClientRect();
+      const px = (e.clientX - rect.left);
+      const py = (e.clientY - rect.top);
+      let bx = clamp(px + 12, 8, rect.width - 232);
+      let by = clamp(py - 10, 8, rect.height - 120);
+      bubble.style.left = bx + "px";
+      bubble.style.top = by + "px";
+      bubble.classList.add("show");
+    });
+  });
+  svg.addEventListener("click", (e) => {
+    if (!e.target.closest(".hit")) bubble.classList.remove("show");
+  });
+}
+
+function renderAll() {
+  const t = deriveTree(state);
+  $("treeHost").innerHTML = buildTree(t);
+  $("bubble").classList.remove("show");
+  renderBalance(t);
+  renderHoldings(t);
+  renderMetrics(t);
+  // slider value labels
+  $("vAge").textContent = state.age + "歳";
+  $("vYears").textContent = state.years.toFixed(1) + "年";
+  $("vDiv").textContent = state.divScore < 0.4 ? "1銘柄級" : state.divScore < 2 ? "数〜数十" : "数千（分散）";
+  $("vEq").textContent = (state.equity/10000).toLocaleString() + "万";
+  $("vBond").textContent = (state.bond/10000).toLocaleString() + "万";
+  $("vOther").textContent = (state.other/10000).toLocaleString() + "万";
+  $("vCash").textContent = (state.cash/10000).toLocaleString() + "万";
+  renderProfiles();
+  attachTreeInteractions(t);
+}
+
+// スライダー配線
+["sAge","sYears","sDiv","sEq","sBond","sOther","sCash"].forEach(id => {
+  $(id).addEventListener("input", readSliders);
+});
+$("resetBtn").addEventListener("click", () => selectProfile(activeId));
+
+// 起動
+syncSliders();
+renderAll();
+</script>
+
+<style>
+  .sway { animation: sway var(--dur) ease-in-out infinite alternate; }
+  @keyframes sway {
+    from { transform: rotate(calc(var(--amp) * -1)); }
+    to   { transform: rotate(var(--amp)); }
+  }
+  .gust { animation: gust 2.4s linear infinite; }
+  @keyframes gust {
+    0% { transform: translateX(-40px); opacity: 0; }
+    30% { opacity: 0.5; }
+    100% { transform: translateX(360px); opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sway, .gust { animation: none; }
+  }
+</style>
+</body>
+</html>
