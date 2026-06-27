@@ -673,7 +673,7 @@ function buildTree(t) {
   const depth = clamp(Math.round(2 + t.H / 90), 2, 5);   // 樹齢が高いほど枝分かれが多い
   const trunkAng = Math.PI / 2 - wind * 0.10;            // 根元のわずかな傾き
   const tintEq = { main: greenMain, dk: greenDk };
-  const tintBd = { main: "#5fb4ab", dk: "#4a988e" };   // 債券＝はっきり青緑（ティール）で株と区別
+  const tintBd = { main: "#56a59d", dk: "#447d76" };   // 債券＝奥に引っ込む落ち着いた青緑
   const baseBucket = { br: "", lf: "" }, eqBucket = { br: "", lf: "" }, bdBucket = { br: "", lf: "" };
   let newTrunkVisW = 0;   // 新しい幹の根元の見かけ幅（切り株との比較用）
 
@@ -699,8 +699,9 @@ function buildTree(t) {
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
     baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.4, fx, fy, trunkW)}"/>`;
-    grow(fx, fy, trunkAng + 0.34, t.H * 0.24, ew, depth, tintEq, eqBucket);  // 株（左）
-    grow(fx, fy, trunkAng - 0.30, t.H * 0.24, bw, depth, tintBd, bdBucket);  // 債券（右）
+    // 株は手前・債券は奥。重なりで奥行きを出すため開きは控えめ、債券は少し高く後ろへ。
+    grow(fx, fy, trunkAng - 0.16, t.H * 0.28, bw, depth, tintBd, bdBucket);  // 債券（奥・やや高い）
+    grow(fx, fy, trunkAng + 0.17, t.H * 0.24, ew, depth, tintEq, eqBucket);  // 株（手前）
   }
 
   const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
@@ -731,11 +732,16 @@ function buildTree(t) {
 
   // 枝は株(緑みの茶)／債券(暖かい茶)でうっすら色分け＆クリックで内訳。
   // 樹冠の葉は左右が混ざるので1グループにまとめ、クリックすると全体の内訳を表示。
+  // 描画順＝奥行き：幹 → 債券(奥) → 株(手前)。それぞれ枝のあとに葉を重ねる。
   let trunkSVG = "";
   trunkSVG += `<g class="hit" data-part="base" fill="url(#barkE)" ${strk}>${baseBucket.br}</g>`;
+  if (bdBucket.br) {
+    trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkBd)" ${strk}>${bdBucket.br}</g>`;
+    trunkSVG += `<g class="hit" data-part="bond" stroke="none">${bdBucket.lf}</g>`;
+  }
   trunkSVG += `<g class="hit" data-part="equity" fill="url(#barkEq)" ${strk}>${eqBucket.br}</g>`;
-  if (bdBucket.br) trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkBd)" ${strk}>${bdBucket.br}</g>`;
-  const leavesSVG = `<g class="hit" data-part="leaves" stroke="none">${eqBucket.lf}${bdBucket.lf}</g>`;
+  trunkSVG += `<g class="hit" data-part="equity" stroke="none">${eqBucket.lf}</g>`;
+  const leavesSVG = "";  // 葉は各資産グループに統合済み
 
   // 実り＝資産から得られる「年間に使えるお金」（4%目安）。資産が大きいほど鈴なり。
   let fruitsSVG = "";
@@ -801,11 +807,11 @@ function buildTree(t) {
   let labels = "";
   const tSty = `text-anchor="middle" font-weight="700" pointer-events="none" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.2" stroke-linejoin="round" style="font-family:inherit"`;
   const lY = GROUND - clamp(t.H * 0.72, 72, 300);
-  const lOff = Math.max(66, t.H * 0.30);
   const lfs = clamp(t.H * 0.07, 13, 21).toFixed(0);
   if (t.isFork) {
-    labels += `<text x="${f1(CX - lOff)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
-    labels += `<text x="${f1(CX + lOff)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#1f7d70" opacity="0.66">債券</text>`;
+    // 債券＝奥（上・控えめ）、株＝手前（下・はっきり）
+    labels += `<text x="${f1(CX + 30)}" y="${f1(lY - 34)}" ${tSty} font-size="${(+lfs - 2)}" fill="#3a847b" opacity="0.5">債券</text>`;
+    labels += `<text x="${f1(CX - 30)}" y="${f1(lY + 18)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.66">株</text>`;
   } else {
     labels += `<text x="${f1(CX)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
   }
