@@ -137,6 +137,8 @@
   .cash-badge .amt-s { color: #c2703a; font-weight: 700; }
 
   .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .sell-toggle { display: flex !important; align-items: center; gap: 8px; justify-content: flex-start !important; font-size: 13px; color: var(--ink); margin: 4px 0 2px; cursor: pointer; }
+  .sell-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
   .needs label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-soft); margin: 10px 0 2px; }
   .needs label span.v { color: var(--ink); font-weight: 700; }
   .needs input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -354,6 +356,16 @@
       <details class="box">
         <summary>② 🌳 保有商品（中長期の投資） <span id="customTag"></span></summary>
         <div id="holdings"></div>
+      </details>
+
+      <details class="box needs">
+        <summary>🪓 もし売却して積み立て直したら？</summary>
+        <p class="needs-lead">中長期の資産を売ると木は切り株に。積み立て直すと切り株の上から新しい幹が育ち、太さが追いつくと傷あとは瘤だけになります。</p>
+        <label class="sell-toggle"><input type="checkbox" id="iSell"> 中長期資産を売却して積み立て直す</label>
+        <div id="sellControls" style="display:none">
+          <label>売却後に積み立てた年数 <span class="v" id="vRestart"></span></label>
+          <input type="range" id="iRestart" min="0" max="40" step="0.5" value="0">
+        </div>
       </details>
     </div>
   </div>
@@ -574,8 +586,11 @@ function buildTree(t) {
   const greenMain = wind > 0.55 ? "#8fae7a" : "#79b46f"; // 暴風は少しくすむ
   const greenDk = "#5e9a59";
 
-  const baseY = GROUND;
   const f1 = n => n.toFixed(1);
+  // 売却モード：木は伐採されて切り株になり、新しい幹は切り株の上から生える
+  const sell = (t.sell && t.sell.on) ? t.sell : null;
+  const cutH = sell ? clamp(sell.stumpW * 1.7, 46, 108) : 0;  // 切り株の高さ
+  const baseY = GROUND - cutH;   // 新しい木が生え始める高さ（=切り口）
 
   // 再現性のある擬似乱数（同じ条件なら同じ樹形に＝再描画で形がブレない）
   let _seed = 1337;
@@ -633,11 +648,15 @@ function buildTree(t) {
   const tintEq = { main: greenMain, dk: greenDk };
   const tintBd = { main: "#5fb4ab", dk: "#4a988e" };   // 債券＝はっきり青緑（ティール）で株と区別
   const baseBucket = { br: "", lf: "" }, eqBucket = { br: "", lf: "" }, bdBucket = { br: "", lf: "" };
+  let newTrunkVisW = 0;   // 新しい幹の根元の見かけ幅（切り株との比較用）
+
+  const gs = t.girthScale != null ? t.girthScale : 1;   // 売却後の再成長で幹を細く（追いつくと1.0）
 
   if (t.forkRatio <= 0.02) {
     /* ----- 1本幹（株式100%）----- */
     t.isFork = false;
-    const W = Math.max(5, t.equityGirth);
+    const W = Math.max(3, t.equityGirth * gs);
+    newTrunkVisW = W * 1.5;
     const Lf = t.H * 0.30;                                // しっかりした1本の幹
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     baseBucket.br += `<path d="${branchPath(CX, baseY, W * 1.5, fx, fy, W)}"/>`;  // 末広がりの根元
@@ -645,9 +664,10 @@ function buildTree(t) {
   } else {
     /* ----- 二股（株 + 債券）：1本の幹から株(左)・債券(右)の2本に分かれる ----- */
     t.isFork = true;
-    const ew = Math.max(5, t.equityGirth);   // 株の主枝＝分散度で太さが決まる
-    const bw = Math.max(5, t.bondGirth);     // 債券の主枝＝量で太さが決まる
+    const ew = Math.max(3, t.equityGirth * gs);   // 株の主枝＝分散度で太さが決まる
+    const bw = Math.max(3, t.bondGirth * gs);     // 債券の主枝＝量で太さが決まる
     const trunkW = Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);  // 幹は主枝より太い
+    newTrunkVisW = trunkW * 1.4;
     const Lf = t.H * 0.34;
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
@@ -656,9 +676,34 @@ function buildTree(t) {
     grow(fx, fy, trunkAng - 0.30, t.H * 0.24, bw, depth, tintBd, bdBucket);  // 債券（右）
   }
 
+  const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
+
+  // 切り株（売却モード）：地面→切り口の太い幹。新しい幹が太るほど切り口を覆い、
+  // 追いつくと年輪は隠れて境目が消え、瘤（こぶ）だけが残る。
+  let stumpSVG = "";
+  if (sell) {
+    const sw = sell.stumpW, flare = sw * 1.3, ry = sw * 0.17;
+    // 切り株本体
+    stumpSVG += `<path d="M ${f1(CX - flare/2)} ${f1(GROUND)} ` +
+      `C ${f1(CX - sw*0.52)} ${f1(GROUND - cutH*0.5)}, ${f1(CX - sw/2)} ${f1(baseY + 5)}, ${f1(CX - sw/2)} ${f1(baseY)} ` +
+      `L ${f1(CX + sw/2)} ${f1(baseY)} ` +
+      `C ${f1(CX + sw/2)} ${f1(baseY + 5)}, ${f1(CX + sw*0.52)} ${f1(GROUND - cutH*0.5)}, ${f1(CX + flare/2)} ${f1(GROUND)} Z" ` +
+      `fill="url(#barkE)" ${strk}/>`;
+    // 切り口の年輪（新しい幹が上に重なって、太るほど隠れていく）
+    stumpSVG += `<ellipse cx="${f1(CX)}" cy="${f1(baseY)}" rx="${f1(sw/2)}" ry="${f1(ry)}" fill="#caa46a"/>`;
+    for (let k = 1; k <= 3; k++) {
+      const t2 = k / 3.5;
+      stumpSVG += `<ellipse cx="${f1(CX)}" cy="${f1(baseY)}" rx="${f1((sw/2)*t2)}" ry="${f1(ry*t2)}" fill="none" stroke="#a8804f" stroke-width="1" opacity="0.7"/>`;
+    }
+    // 追いついたら瘤（こぶ）を幹に足し、切り口の境目をならす
+    if (newTrunkVisW >= sw * 0.92) {
+      baseBucket.br += `<ellipse cx="${f1(CX - newTrunkVisW*0.34)}" cy="${f1(baseY + 6)}" rx="${f1(sw*0.15)}" ry="${f1(sw*0.12)}"/>`;
+      baseBucket.br += `<ellipse cx="${f1(CX + newTrunkVisW*0.30)}" cy="${f1(baseY + 11)}" rx="${f1(sw*0.11)}" ry="${f1(sw*0.09)}"/>`;
+    }
+  }
+
   // 枝は株(緑みの茶)／債券(暖かい茶)でうっすら色分け＆クリックで内訳。
   // 樹冠の葉は左右が混ざるので1グループにまとめ、クリックすると全体の内訳を表示。
-  const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
   let trunkSVG = "";
   trunkSVG += `<g class="hit" data-part="base" fill="url(#barkE)" ${strk}>${baseBucket.br}</g>`;
   trunkSVG += `<g class="hit" data-part="equity" fill="url(#barkEq)" ${strk}>${eqBucket.br}</g>`;
@@ -806,8 +851,11 @@ function buildTree(t) {
     <!-- 木の影 -->
     <ellipse cx="${CX+10}" cy="${GROUND+10}" rx="${90 + t.H*0.1}" ry="14" fill="rgba(90,70,40,0.16)"/>
 
-    <!-- 揺れるグループ（幹＋葉） -->
-    <g class="sway" style="transform-origin:${CX}px ${GROUND}px;">
+    <!-- 切り株（売却モードのみ・揺れない） -->
+    ${stumpSVG}
+
+    <!-- 揺れるグループ（幹＋葉）。売却時は切り口を支点に揺れる -->
+    <g class="sway" style="transform-origin:${CX}px ${baseY}px;">
       ${trunkSVG}
       ${leavesSVG}
     </g>
@@ -876,6 +924,16 @@ function windLabel(wind, gap) {
 let activeId = PROFILES[0].id;
 let state = profileToState(PROFILES[0]);
 let custom = false;
+let sellMode = false;      // 中長期資産を売却して積み立て直すモード
+let restartYears = 0;      // 売却後に再積立してからの年数
+
+// 幹の根元の太さ（切り株の太さの算出に使う）
+function trunkWidthOf(td) {
+  const ew = Math.max(5, td.equityGirth);
+  if (td.forkRatio <= 0.02) return ew;
+  const bw = Math.max(5, td.bondGirth);
+  return Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);
+}
 
 const $ = id => document.getElementById(id);
 
@@ -1054,7 +1112,19 @@ function renderCashBadge(nd) {
 }
 
 function renderAll() {
-  const t = deriveTree(state);
+  let t;
+  if (sellMode) {
+    // 売却＝伐採。切り株の太さは「これまで積み立てた木」のサイズ。
+    const stumpW = trunkWidthOf(deriveTree(state));
+    // 木の本体は再積立年数で育つ（切り株の上から生える）
+    t = deriveTree({ ...state, years: restartYears });
+    t.sell = { on: true, stumpW };
+    // 再成長は最初は細く、元の積立年数に近づくほど切り株の太さに追いつく
+    const mat = clamp(restartYears / Math.max(state.years, 0.5), 0, 1);
+    t.girthScale = 0.30 + 0.70 * mat;
+  } else {
+    t = deriveTree(state);
+  }
   // 必要現金と余力 → 根のボリュームに反映
   const nd = computeNeeds();
   t.cash = state.cash;
@@ -1076,6 +1146,7 @@ function renderAll() {
   $("vBond").textContent = (state.bond/10000).toLocaleString() + "万";
   $("vOther").textContent = (state.other/10000).toLocaleString() + "万";
   $("vCash").textContent = (state.cash/10000).toLocaleString() + "万";
+  $("vRestart").textContent = restartYears.toFixed(1) + "年";
   renderProfiles();
   attachTreeInteractions(t);
 }
@@ -1087,6 +1158,16 @@ function renderAll() {
 // 現金の土台（必要現金）の入力 → 再描画のみ（保有データは変えない）
 ["iMonthly","iMonths","iNear"].forEach(id => {
   $(id).addEventListener("input", renderAll);
+});
+// 売却して積み立て直すモード
+$("iSell").addEventListener("change", (e) => {
+  sellMode = e.target.checked;
+  $("sellControls").style.display = sellMode ? "block" : "none";
+  renderAll();
+});
+$("iRestart").addEventListener("input", (e) => {
+  restartYears = +e.target.value;
+  renderAll();
 });
 $("resetBtn").addEventListener("click", () => selectProfile(activeId));
 
