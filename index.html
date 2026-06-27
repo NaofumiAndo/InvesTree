@@ -367,6 +367,18 @@
       </details>
 
       <details class="box needs">
+        <summary>🍃 これからの積立で年代に合わせる</summary>
+        <p class="needs-lead">売って減らすのではなく、これからの積立の振り分けで整えます。木は切らずに形が変わります。</p>
+        <label>毎月の積立額 <span class="v" id="vContrib"></span></label>
+        <input type="range" id="iContrib" min="0" max="30" step="1" value="5">
+        <label>これからの積立を債券にまわす割合 <span class="v" id="vBondAlloc"></span></label>
+        <input type="range" id="iBondAlloc" min="0" max="100" step="5" value="30">
+        <label>何年後を見る <span class="v" id="vProjYears"></span></label>
+        <input type="range" id="iProjYears" min="0" max="30" step="1" value="0">
+        <div id="projResult" class="needs-result"></div>
+      </details>
+
+      <details class="box needs">
         <summary>💰 まとまったお金が急に必要になったら？</summary>
         <p class="needs-lead">急な出費のとき、投資をどう扱う？ 選んだ方法で木の運命が変わります。</p>
         <label>必要な金額 <span class="v" id="vNeedCash"></span></label>
@@ -968,6 +980,10 @@ let custom = false;
 let payMethod = "none";    // 急な出費への対応: none / sell / loan
 let needCash = 1000000;    // 必要な金額
 let restartYears = 0;      // 売却後に再積立してからの年数
+let contribMonthly = 50000; // これからの毎月の積立額
+let bondAlloc = 0.30;      // これからの積立を債券にまわす割合（残りは株）
+let projYears = 0;         // 何年後を投影するか
+let projInfo = null;       // 投影中の表示情報
 const RETURN_RATE = 0.05;  // 運用利回り（前提・調整可）
 const LOAN_RATE = 0.03;    // 担保ローン金利（前提・調整可）
 
@@ -998,6 +1014,12 @@ function selectProfile(id) {
   const p = PROFILES.find(x => x.id === id);
   state = profileToState(p);
   custom = false;
+  // 検討モード（売却・投影）はプロフィール切替でリセット
+  payMethod = "none"; restartYears = 0; projYears = 0; projInfo = null;
+  document.querySelectorAll(".method-btn").forEach(b => b.classList.toggle("active", b.getAttribute("data-method") === "none"));
+  if ($("sellControls")) $("sellControls").style.display = "none";
+  if ($("iRestart")) $("iRestart").value = 0;
+  if ($("iProjYears")) $("iProjYears").value = 0;
   syncSliders();
   renderAll();
 }
@@ -1052,6 +1074,13 @@ function renderHoldings(t) {
 
 function renderBalance(t) {
   const p = currentProfile();
+  if (projInfo && projInfo.active) {
+    $("who").textContent = `${projInfo.years}年後の予測（${projInfo.age}歳）`;
+    $("amt").textContent = "¥" + Math.round(projInfo.total).toLocaleString();
+    $("delta").textContent = `これからの積立で育った姿`;
+    $("customTag").innerHTML = `<span class="tag-custom">投影中</span>`;
+    return;
+  }
   const total = state.equity + state.bond + state.other;
   $("who").textContent = custom ? "カスタム設定" : `${p.name}・${p.note}`;
   $("amt").textContent = "¥" + total.toLocaleString();
@@ -1166,10 +1195,18 @@ function renderAll() {
     // 再成長は最初は細く、元の積立年数に近づくほど切り株の太さに追いつく
     const mat = clamp(restartYears / Math.max(state.years, 0.5), 0, 1);
     t.girthScale = 0.30 + 0.70 * mat;
+  } else if (projYears > 0) {
+    // 売らずに、これからの積立の振り分けで整える（N年後を投影）
+    const addAmt = contribMonthly * 12 * projYears;
+    const fe = state.equity + addAmt * (1 - bondAlloc);
+    const fb = state.bond + addAmt * bondAlloc;
+    t = deriveTree({ ...state, age: state.age + projYears, years: state.years + projYears, equity: fe, bond: fb });
+    projInfo = { active: true, years: projYears, total: fe + fb + state.other, age: state.age + projYears };
   } else {
     // 担保ローンは木をそのまま残す（運用継続）。none も通常の木。
     t = deriveTree(state);
   }
+  if (projYears <= 0 || payMethod === "sell") projInfo = null;
   // 必要現金と余力 → 根のボリュームに反映
   const nd = computeNeeds();
   t.cash = state.cash;
@@ -1184,6 +1221,7 @@ function renderAll() {
   renderNeeds(nd);
   renderCashBadge(nd);
   renderMethod();
+  renderProj(t);
   // slider value labels
   $("vAge").textContent = state.age + "歳";
   $("vYears").textContent = state.years.toFixed(1) + "年";
@@ -1194,8 +1232,33 @@ function renderAll() {
   $("vCash").textContent = (state.cash/10000).toLocaleString() + "万";
   $("vRestart").textContent = restartYears.toFixed(1) + "年";
   $("vNeedCash").textContent = manen(needCash);
+  $("vContrib").textContent = (contribMonthly / 10000) + "万/月";
+  $("vBondAlloc").textContent = `債${Math.round(bondAlloc*100)}% : 株${100-Math.round(bondAlloc*100)}%`;
+  $("vProjYears").textContent = projYears > 0 ? projYears + "年後" : "いま";
   renderProfiles();
   attachTreeInteractions(t);
+}
+
+// これからの積立で年代に合わせる（売らずにリバランス）＋ 年代のおすすめ配分
+function renderProj(t) {
+  const el = $("projResult");
+  const targetNow = clamp(110 - state.age, 20, 90);
+  if (projYears <= 0) {
+    el.innerHTML =
+      `<div class="needs-row"><span class="lab">いまの年代のおすすめ（${state.age}歳）</span><span class="num">株${Math.round(targetNow)}% : 債${100-Math.round(targetNow)}%</span></div>` +
+      `<div class="needs-note">「何年後を見る」を動かすと、これからの積立だけで木の形がどう整うかを投影します（売却なし）。年齢とともに債券へ多めにまわすと、おすすめ配分に沿って風が穏やかに。</div>`;
+    return;
+  }
+  const futAge = state.age + projYears;
+  const futTarget = clamp(110 - futAge, 20, 90);
+  const eqPct = (t.equity + t.bond) > 0 ? Math.round(t.equityPctSB) : 0;
+  const w = windLabel(t.wind, t.gap);
+  el.innerHTML =
+    `<div class="needs-verdict ok">🍃 売らずに整える（${projYears}年後・${futAge}歳）</div>` +
+    `<div class="needs-row"><span class="lab">${projYears}年後の保有 株:債</span><span class="num">${eqPct}% : ${100-eqPct}%</span></div>` +
+    `<div class="needs-row"><span class="lab">その年代のおすすめ</span><span class="num">株${Math.round(futTarget)}% : 債${100-Math.round(futTarget)}%</span></div>` +
+    `<div class="needs-row"><span class="lab">木の風</span><span class="num" style="color:${w.color}">${w.txt}</span></div>` +
+    `<div class="needs-note">売却ゼロ。これからの積立を債券に${Math.round(bondAlloc*100)}%まわした場合。おすすめ比率に近づくほど風が穏やかになります。</div>`;
 }
 
 // 急な出費への対応：売る vs 担保ローン の比較（前提利回り・金利は概算）
@@ -1252,6 +1315,10 @@ $("iRestart").addEventListener("input", (e) => {
   restartYears = +e.target.value;
   renderAll();
 });
+// これからの積立で年代に合わせる（売らずにリバランス）
+$("iContrib").addEventListener("input", (e) => { contribMonthly = (+e.target.value) * 10000; renderAll(); });
+$("iBondAlloc").addEventListener("input", (e) => { bondAlloc = (+e.target.value) / 100; renderAll(); });
+$("iProjYears").addEventListener("input", (e) => { projYears = +e.target.value; renderAll(); });
 $("resetBtn").addEventListener("click", () => selectProfile(activeId));
 
 // 起動
