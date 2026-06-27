@@ -987,7 +987,7 @@ function renderNeeds(nd) {
     verdict;
 }
 
-let cashBadgeCollapsed = false;   // 余力バッジの折りたたみ状態（タップで切替）
+let cashBadgeCollapsed = true;    // 既定は小さく折りたたみ、タップで展開
 
 function renderCashBadge(nd) {
   const cash = state.cash;
