@@ -61,6 +61,11 @@
     font-size: 12px;
     color: var(--ink-soft);
   }
+  .dev-sliders {
+    text-align: left;
+    max-width: 560px;
+    margin: 16px auto 0;
+  }
   .profiles {
     display: flex;
     flex-wrap: wrap;
@@ -338,45 +343,32 @@
         <div id="needsResult" class="needs-result"></div>
       </details>
 
-      <details class="box">
-        <summary>この木が表していること</summary>
-        <div class="metrics" id="metrics"></div>
-      </details>
-
-      <details class="box sliders">
-        <summary>パラメータを調整（デモ）</summary>
-        <label>年齢 <span class="v" id="vAge"></span></label>
-        <input type="range" id="sAge" min="20" max="80" step="1">
-        <label>積立継続年数 <span class="v" id="vYears"></span></label>
-        <input type="range" id="sYears" min="0" max="40" step="0.5">
-        <label>株式の分散度（実質銘柄数） <span class="v" id="vDiv"></span></label>
-        <input type="range" id="sDiv" min="0" max="3.5" step="0.05">
-        <label>株式の量 <span class="v" id="vEq"></span></label>
-        <input type="range" id="sEq" min="0" max="100" step="1">
-        <label>債券の量 <span class="v" id="vBond"></span></label>
-        <input type="range" id="sBond" min="0" max="100" step="1">
-        <label>その他資産の量（REIT・金・暗号資産等） <span class="v" id="vOther"></span></label>
-        <input type="range" id="sOther" min="0" max="100" step="1">
-        <label>現金・MRF等の量（土台） <span class="v" id="vCash"></span></label>
-        <input type="range" id="sCash" min="0" max="100" step="1">
-        <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
-      </details>
-
-      <details class="box">
-        <summary>木が伝える3つの学び</summary>
-        <ul class="learnings">
-          <li>🌱 <b>長期積立</b> … 続けるほど木は高く育つ（樹高＝継続年数）</li>
-          <li>🪵 <b>分散</b> … 1銘柄集中は細くひょろり、分散はどっしり太い幹</li>
-          <li>🍃 <b>年代別リバランス</b> … 年齢に対し株が過剰だと暴風。債券の幹が育つと二股で踏ん張れる</li>
-        </ul>
-      </details>
     </div>
   </div>
 
   <div class="dev-switcher">
-    <h2>🛠 開発者用：プロフィール切り替え</h2>
-    <p>保有商品・積立期間・年齢がバラバラな5人を切り替えて、木の形の変化を確認できます。</p>
+    <h2>🛠 開発者用</h2>
+    <p>保有商品・積立期間・年齢がバラバラな5人を切り替えたり、パラメータを直接いじって木の形の変化を確認できます。</p>
     <div class="profiles" id="profiles"></div>
+
+    <details class="box sliders dev-sliders">
+      <summary>パラメータを直接調整</summary>
+      <label>年齢 <span class="v" id="vAge"></span></label>
+      <input type="range" id="sAge" min="20" max="80" step="1">
+      <label>積立継続年数 <span class="v" id="vYears"></span></label>
+      <input type="range" id="sYears" min="0" max="40" step="0.5">
+      <label>株式の分散度（実質銘柄数） <span class="v" id="vDiv"></span></label>
+      <input type="range" id="sDiv" min="0" max="3.5" step="0.05">
+      <label>株式の量 <span class="v" id="vEq"></span></label>
+      <input type="range" id="sEq" min="0" max="100" step="1">
+      <label>債券の量 <span class="v" id="vBond"></span></label>
+      <input type="range" id="sBond" min="0" max="100" step="1">
+      <label>その他資産の量（REIT・金・暗号資産等） <span class="v" id="vOther"></span></label>
+      <input type="range" id="sOther" min="0" max="100" step="1">
+      <label>現金・MRF等の量（土台） <span class="v" id="vCash"></span></label>
+      <input type="range" id="sCash" min="0" max="100" step="1">
+      <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
+    </details>
   </div>
 </div>
 
@@ -908,24 +900,6 @@ function renderHoldings(t) {
   + `<div class="holding"><div class="nm"><span class="dot other" style="background:#bcbcbc"></span>現金（生活防衛資金）</div><div class="amt2">${(p.cash/10000).toLocaleString()}万円</div></div>`;
 }
 
-function renderMetrics(t) {
-  const w = windLabel(t.wind, t.gap);
-  const girthTxt = t.equityGirth < 16 ? "細い（集中）" : t.equityGirth < 34 ? "ふつう" : "太い（分散）";
-  const forkTxt = t.forkRatio < 0.02 ? "1本幹（株100%）"
-    : Math.abs(t.forkRatio - 0.5) < 0.08 ? "ほぼ対称（理想）" : "二股";
-  const m = [
-    ["積立年数（樹高）", state.years.toFixed(1) + " 年"],
-    ["株式の分散（幹の太さ）", girthTxt],
-    ["株:債の幹", forkTxt],
-    ["推奨株式比率(target)", Math.round(t.target) + " %"],
-    ["実際の株式比率", t.equity + t.bond > 0 ? Math.round(t.equityPctSB) + " %" : "—"],
-    ["ズレ(gap)→風", `<span class="wind-badge" style="color:${w.color}">${w.txt}</span>`],
-  ];
-  $("metrics").innerHTML = m.map(([l, v]) =>
-    `<div class="metric"><div class="lab">${l}</div><div class="val">${v}</div></div>`
-  ).join("");
-}
-
 function renderBalance(t) {
   const p = currentProfile();
   const total = state.equity + state.bond + state.other;
@@ -1050,7 +1024,6 @@ function renderAll() {
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
-  renderMetrics(t);
   renderNeeds(nd);
   renderCashBadge(nd);
   // slider value labels
