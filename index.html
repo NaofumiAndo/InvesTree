@@ -139,6 +139,14 @@
   .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
   .sell-toggle { display: flex !important; align-items: center; gap: 8px; justify-content: flex-start !important; font-size: 13px; color: var(--ink); margin: 4px 0 2px; cursor: pointer; }
   .sell-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .method-row { display: flex; gap: 8px; margin: 10px 0 4px; }
+  .method-btn {
+    flex: 1; border: 2px solid #ead9bd; background: #fffdf8; color: var(--ink);
+    border-radius: 12px; padding: 8px 4px; font-size: 12.5px; font-weight: 700;
+    cursor: pointer; font-family: inherit; transition: all .12s ease;
+  }
+  .method-btn:hover { border-color: var(--accent); }
+  .method-btn.active { background: #eef7ea; border-color: var(--accent); color: var(--accent-dk); }
   .needs label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-soft); margin: 10px 0 2px; }
   .needs label span.v { color: var(--ink); font-weight: 700; }
   .needs input[type=range] { width: 100%; accent-color: var(--accent); }
@@ -359,11 +367,18 @@
       </details>
 
       <details class="box needs">
-        <summary>🪓 もし売却して積み立て直したら？</summary>
-        <p class="needs-lead">中長期の資産を売ると木は切り株に。積み立て直すと切り株の上から新しい幹が育ち、太さが追いつくと傷あとは瘤だけになります。</p>
-        <label class="sell-toggle"><input type="checkbox" id="iSell"> 中長期資産を売却して積み立て直す</label>
+        <summary>💰 まとまったお金が急に必要になったら？</summary>
+        <p class="needs-lead">急な出費のとき、投資をどう扱う？ 選んだ方法で木の運命が変わります。</p>
+        <label>必要な金額 <span class="v" id="vNeedCash"></span></label>
+        <input type="range" id="iNeedCash" min="0" max="500" step="10" value="100">
+        <div class="method-row">
+          <button class="method-btn active" data-method="none">そのまま</button>
+          <button class="method-btn" data-method="sell">売る 🪓</button>
+          <button class="method-btn" data-method="loan">担保ローン 💳</button>
+        </div>
+        <div id="methodResult" class="needs-result"></div>
         <div id="sellControls" style="display:none">
-          <label>売却後に積み立てた年数 <span class="v" id="vRestart"></span></label>
+          <label>売却後に積み立て直した年数 <span class="v" id="vRestart"></span></label>
           <input type="range" id="iRestart" min="0" max="40" step="0.5" value="0">
         </div>
       </details>
@@ -710,6 +725,22 @@ function buildTree(t) {
   if (bdBucket.br) trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkBd)" ${strk}>${bdBucket.br}</g>`;
   const leavesSVG = `<g class="hit" data-part="leaves" stroke="none">${eqBucket.lf}${bdBucket.lf}</g>`;
 
+  // 実り＝資産から得られる「年間に使えるお金」（4%目安）。資産が大きいほど鈴なり。
+  let fruitsSVG = "";
+  const totalAssets = t.equity + t.bond + t.other;
+  if (totalAssets > 0 && tips.length && !sell) {
+    const nFruit = clamp(Math.round(Math.log10(Math.max(1, totalAssets / 100000)) * 3), 0, 14);
+    const shuffled = tips.slice().sort(() => rng() - 0.5);
+    let fr = "";
+    for (let i = 0; i < nFruit && i < shuffled.length; i++) {
+      const tp = shuffled[i];
+      const fx = tp.x + (rng() - 0.5) * 14, fy = tp.y + (rng() - 0.5) * 14;
+      fr += `<circle cx="${f1(fx)}" cy="${f1(fy)}" r="4.5" fill="#ef9a5a"/>`;
+      fr += `<circle cx="${f1(fx - 1.3)}" cy="${f1(fy - 1.3)}" r="1.4" fill="#ffd9b0"/>`;
+    }
+    fruitsSVG = `<g class="hit" data-part="fruit">${fr}</g>`;
+  }
+
   // その他資産（REIT・金・暗号資産等）＝木とは別物。足元に置く「鉢植え」で表す。
   // 過大だと鉢が増えて大きくなり、本体の木より目立つ＝偏りの警告に。
   function pottedPlant(x, gy, s, hue) {
@@ -858,6 +889,7 @@ function buildTree(t) {
     <g class="sway" style="transform-origin:${CX}px ${baseY}px;">
       ${trunkSVG}
       ${leavesSVG}
+      ${fruitsSVG}
     </g>
 
     <!-- その他資産＝足元の鉢植え（木とは別物・揺れない） -->
@@ -892,6 +924,14 @@ function breakdownHTML(part, t) {
       return head("🌿 債券", state.bond, "#a9803b") + rowsFor("bond", "債券", state.bond);
     case "other":
       return head("🪴 その他資産", state.other, "#c2703a") + rowsFor("other", "その他", state.other);
+    case "fruit": {
+      const total = state.equity + state.bond + state.other;
+      const income = total * 0.04;
+      return head("🍑 実り＝使えるお金", income, "#d77f3f") +
+        `<div class="bd-row"><span class="bd-nm">投資資産</span><span class="bd-amt">${yen(total)}</span></div>` +
+        `<div class="bd-row"><span class="bd-nm">年間に使える目安(4%)</span><span class="bd-amt">${yen(income)}</span></div>` +
+        `<div class="bd-row" style="color:var(--ink-soft);font-size:11.5px;border:none">資産が育つほど、毎年の“使えるお金”＝可処分所得が増えます。</div>`;
+    }
     case "roots": {
       const cash = state.cash, nec = t.necessaryCash || 0, over = t.excessCash || 0;
       let s = head("🌱 現金（土台）", cash, "#5b8f5b");
@@ -907,7 +947,8 @@ function breakdownHTML(part, t) {
         `<div class="bd-row"><span class="bd-nm">🌳 株式</span><span class="bd-amt">${yen(state.equity)}</span></div>` +
         `<div class="bd-row"><span class="bd-nm">🌿 債券</span><span class="bd-amt">${yen(state.bond)}</span></div>` +
         `<div class="bd-row"><span class="bd-nm">🪴 その他</span><span class="bd-amt">${yen(state.other)}</span></div>` +
-        `<div class="bd-row"><span class="bd-nm">🌱 現金</span><span class="bd-amt">${yen(state.cash)}</span></div>`;
+        `<div class="bd-row"><span class="bd-nm">🌱 現金</span><span class="bd-amt">${yen(state.cash)}</span></div>` +
+        `<div class="bd-row" style="border-top:1px solid #ecdfc8;margin-top:4px;padding-top:5px"><span class="bd-nm">🍑 年間に使える目安(4%)</span><span class="bd-amt" style="color:#d77f3f">${yen(total * 0.04)}</span></div>`;
     }
   }
 }
@@ -924,8 +965,11 @@ function windLabel(wind, gap) {
 let activeId = PROFILES[0].id;
 let state = profileToState(PROFILES[0]);
 let custom = false;
-let sellMode = false;      // 中長期資産を売却して積み立て直すモード
+let payMethod = "none";    // 急な出費への対応: none / sell / loan
+let needCash = 1000000;    // 必要な金額
 let restartYears = 0;      // 売却後に再積立してからの年数
+const RETURN_RATE = 0.05;  // 運用利回り（前提・調整可）
+const LOAN_RATE = 0.03;    // 担保ローン金利（前提・調整可）
 
 // 幹の根元の太さ（切り株の太さの算出に使う）
 function trunkWidthOf(td) {
@@ -1113,7 +1157,7 @@ function renderCashBadge(nd) {
 
 function renderAll() {
   let t;
-  if (sellMode) {
+  if (payMethod === "sell") {
     // 売却＝伐採。切り株の太さは「これまで積み立てた木」のサイズ。
     const stumpW = trunkWidthOf(deriveTree(state));
     // 木の本体は再積立年数で育つ（切り株の上から生える）
@@ -1123,6 +1167,7 @@ function renderAll() {
     const mat = clamp(restartYears / Math.max(state.years, 0.5), 0, 1);
     t.girthScale = 0.30 + 0.70 * mat;
   } else {
+    // 担保ローンは木をそのまま残す（運用継続）。none も通常の木。
     t = deriveTree(state);
   }
   // 必要現金と余力 → 根のボリュームに反映
@@ -1138,6 +1183,7 @@ function renderAll() {
   renderHoldings(t);
   renderNeeds(nd);
   renderCashBadge(nd);
+  renderMethod();
   // slider value labels
   $("vAge").textContent = state.age + "歳";
   $("vYears").textContent = state.years.toFixed(1) + "年";
@@ -1147,8 +1193,41 @@ function renderAll() {
   $("vOther").textContent = (state.other/10000).toLocaleString() + "万";
   $("vCash").textContent = (state.cash/10000).toLocaleString() + "万";
   $("vRestart").textContent = restartYears.toFixed(1) + "年";
+  $("vNeedCash").textContent = manen(needCash);
   renderProfiles();
   attachTreeInteractions(t);
+}
+
+// 急な出費への対応：売る vs 担保ローン の比較（前提利回り・金利は概算）
+function renderMethod() {
+  const el = $("methodResult");
+  const row = (lab, val, c) => `<div class="needs-row"><span class="lab">${lab}</span><span class="num"${c ? ` style="color:${c}"` : ""}>${val}</span></div>`;
+  if (payMethod === "none") {
+    el.innerHTML = `<div class="needs-note">「売る🪓」と「担保ローン💳」を選ぶと、木の運命とコストの違いが見られます。</div>`;
+    return;
+  }
+  if (payMethod === "sell") {
+    const tax = needCash * 0.10;   // 売却額の一部が含み益と仮定し、譲渡益課税の概算
+    el.innerHTML =
+      `<div class="needs-verdict short">🪓 売る＝木を切る</div>` +
+      row("用意できる現金", manen(needCash)) +
+      row("税金（譲渡益に約20%）", "おおよそ " + manen(tax), "#c2703a") +
+      row("複利", "止まる（切り株から育て直し）", "#c2703a") +
+      `<div class="needs-note">右の「積み立て直した年数」を動かすと、切り株から再生する様子が見られます。元の太さに戻るまで時間がかかります。</div>`;
+    return;
+  }
+  // loan
+  const interest = needCash * LOAN_RATE;
+  const keepGain = needCash * RETURN_RATE;
+  const diff = keepGain - interest;
+  el.innerHTML =
+    `<div class="needs-verdict ok">💳 担保ローン＝木はそのまま</div>` +
+    row("借りられる現金", manen(needCash)) +
+    row(`金利コスト（年${(LOAN_RATE*100).toFixed(0)}%）`, "▲ " + manen(interest), "#c2703a") +
+    row(`運用は継続（年${(RETURN_RATE*100).toFixed(0)}%）`, "＋ " + manen(keepGain), "#4f8a52") +
+    row("売却益への課税", "なし（売らないため）", "#4f8a52") +
+    `<div class="needs-verdict ok">差し引き 年 ${(diff>=0?"＋":"")}${manen(diff)} 有利</div>` +
+    `<div class="needs-note">※ 運用利回り>金利のときの概算。相場次第で逆転することもあります（一般的な考え方の例示）。</div>`;
 }
 
 // スライダー配線
@@ -1159,12 +1238,16 @@ function renderAll() {
 ["iMonthly","iMonths","iNear"].forEach(id => {
   $(id).addEventListener("input", renderAll);
 });
-// 売却して積み立て直すモード
-$("iSell").addEventListener("change", (e) => {
-  sellMode = e.target.checked;
-  $("sellControls").style.display = sellMode ? "block" : "none";
-  renderAll();
+// 急な出費への対応：そのまま / 売る / 担保ローン
+document.querySelectorAll(".method-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    payMethod = btn.getAttribute("data-method");
+    document.querySelectorAll(".method-btn").forEach(b => b.classList.toggle("active", b === btn));
+    $("sellControls").style.display = payMethod === "sell" ? "block" : "none";
+    renderAll();
+  });
 });
+$("iNeedCash").addEventListener("input", (e) => { needCash = (+e.target.value) * 10000; renderAll(); });
 $("iRestart").addEventListener("input", (e) => {
   restartYears = +e.target.value;
   renderAll();
