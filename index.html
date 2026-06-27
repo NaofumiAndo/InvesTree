@@ -105,6 +105,42 @@
     overflow: hidden;
     position: relative;
   }
+  .cash-badge {
+    position: absolute;
+    left: 16px;
+    bottom: 36px;
+    z-index: 3;
+    max-width: 78%;
+    background: rgba(255,255,255,0.82);
+    backdrop-filter: blur(3px);
+    border-radius: 14px;
+    padding: 8px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: 0 2px 8px var(--shadow);
+  }
+  .cash-badge .cb-title { font-weight: 700; font-size: 12.5px; }
+  .cash-badge.ok    { border-left: 4px solid #6fae6a; }
+  .cash-badge.short { border-left: 4px solid #d98a5a; }
+  .cash-badge .amt-y { color: var(--accent-dk); font-weight: 700; }
+  .cash-badge .amt-s { color: #c2703a; font-weight: 700; }
+
+  .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .needs label { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-soft); margin: 10px 0 2px; }
+  .needs label span.v { color: var(--ink); font-weight: 700; }
+  .needs input[type=range] { width: 100%; accent-color: var(--accent); }
+  .needs-result { margin-top: 12px; border-top: 1px dashed #ecdfc8; padding-top: 10px; font-size: 12.5px; }
+  .needs-row { display: flex; justify-content: space-between; padding: 2px 0; }
+  .needs-row .lab { color: var(--ink-soft); }
+  .needs-row .num { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .needs-bar { height: 12px; border-radius: 7px; background: #eee3cf; overflow: hidden; margin: 8px 0 6px; position: relative; }
+  .needs-bar .fill { height: 100%; border-radius: 7px; transition: width .25s ease; }
+  .needs-bar .marker { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #8a7560; }
+  .needs-verdict { font-weight: 700; margin-top: 4px; }
+  .needs-verdict.ok { color: var(--accent-dk); }
+  .needs-verdict.short { color: #c2703a; }
+  .needs-note { color: var(--ink-soft); font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+
   .balance {
     position: absolute;
     top: 16px;
@@ -250,6 +286,7 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
+      <div class="cash-badge" id="cashBadge"></div>
       <div class="tree-hint">木の各パーツをタップすると、やさしい解説が出ます 🍃</div>
     </div>
 
@@ -262,6 +299,18 @@
       <div class="box">
         <h2>この木が表していること</h2>
         <div class="metrics" id="metrics"></div>
+      </div>
+
+      <div class="box needs">
+        <h2>🪴 足元の安心（現金の土台）</h2>
+        <p class="needs-lead">まず生活防衛資金と目先の出費を確保。それを満たす現金があるか、残りは投資にまわせる余力かを見ます。</p>
+        <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
+        <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
+        <label>生活防衛資金として確保する月数 <span class="v" id="vMonths"></span></label>
+        <input type="range" id="iMonths" min="1" max="12" step="1" value="3">
+        <label>3年以内に使う予定の大きな出費 <span class="v" id="vNear"></span></label>
+        <input type="range" id="iNear" min="0" max="500" step="10" value="50">
+        <div id="needsResult" class="needs-result"></div>
       </div>
 
       <div class="box sliders">
@@ -278,7 +327,7 @@
         <input type="range" id="sBond" min="0" max="100" step="1">
         <label>その他資産の量（REIT・金・暗号資産等） <span class="v" id="vOther"></span></label>
         <input type="range" id="sOther" min="0" max="100" step="1">
-        <label>現金・生活防衛資金（根の深さ） <span class="v" id="vCash"></span></label>
+        <label>現金・MRF等の量（土台） <span class="v" id="vCash"></span></label>
         <input type="range" id="sCash" min="0" max="100" step="1">
         <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
       </div>
@@ -602,17 +651,19 @@ function buildTree(t) {
     }
   }
 
-  // 根（現金・生活防衛資金）：現金比率が高いほど深く広く張る。
-  // 半分(0.5)を超えると急に大きくなる非線形カーブで「根がでかすぎる」を表現。
-  const rootDepth = t.rootDepth;
-  const rootMag = rootDepth * 1.1 + Math.max(0, rootDepth - 0.5) * 2.6; // 0〜約2.4
+  // 根（現金）：必要な土台（生活防衛資金＋目先の出費）を満たすとちょうど健やか。
+  // 不足なら浅く頼りなく、超過するほど「根が大きすぎる（遊んでいる現金）」に。
+  const cov = t.cashCoverage != null ? t.cashCoverage : 1;
+  const rootMag = cov <= 1
+    ? cov * 0.9                                  // 0→ほぼ無根、1→健やか
+    : Math.min(2.4, 0.9 + (cov - 1) * 0.45);     // 超過するほど肥大
   const rootLen = 16 + rootMag * 98;
   const rootW = 3 + rootMag * 7.5;
   let roots = "";
   const rootAngs = [205, 230, 251, 270, 289, 310, 335];
   for (let i = 0; i < rootAngs.length; i++) {
-    // 現金が少ないうちは本数を絞り、多いほど太く広く張り出す
-    if (rootDepth < 0.22 && (i % 2 === 1)) continue;
+    // 土台が乏しいうちは本数を絞り、満たす〜超過で太く広く張り出す
+    if (cov < 0.45 && (i % 2 === 1)) continue;
     const a = rootAngs[i] * Math.PI / 180;
     const jitter = 0.72 + ((i * 7) % 5) / 11;     // 0.72〜1.08（決定的）
     const len = rootLen * jitter;
@@ -726,10 +777,14 @@ function explain(part, t) {
         : `<b>小枝・彩り</b><br>REITや金などの「その他資産」。花や実のように彩りを添えますが、主構造（幹）は支えません。少量がちょうどよい塩梅です。`;
     case "leaves":
       return `<b>葉の茂り</b><br>評価額や含み益のあらわれ。続けるほど青々と茂ります。下落局面でも色が少しくすむ程度に留めます。`;
-    case "roots":
-      return t.rootDepth > 0.15
-        ? `<b>根（深い）</b><br>現金・生活防衛資金がしっかり。深い根は強風や干ばつ（暴落）に耐える土台です。安心して投資を続けられます。`
-        : `<b>根（浅い）</b><br>現金のクッションが少なめ。根が浅いと倒れやすいので、生活防衛資金を少し厚くすると木が安定します。`;
+    case "roots": {
+      const cov = t.cashCoverage != null ? t.cashCoverage : 1;
+      if (cov < 0.95)
+        return `<b>根（浅い・土台が不足）</b><br>生活防衛資金や目先の出費に対して現金が足りません。根が浅いと強風や干ばつ（暴落）で倒れやすい状態。まず現金で土台を固めましょう。`;
+      if (cov > 1.6)
+        return `<b>根（大きすぎる）</b><br>必要な土台はもう十分。これ以上の現金は地中で眠る「遊んでいるお金」です。余力（${yen(Math.max(0,(t.excessCash||0)))}）は木を育てる種＝投資にまわせます。`;
+      return `<b>根（ちょうどよい土台）</b><br>生活防衛資金と目先の出費をしっかりカバー。深い根は暴落にも耐える安心の土台です。これ以上の現金は投資にまわす余力になります。`;
+    }
     default:
       return "";
   }
@@ -887,13 +942,75 @@ function attachTreeInteractions(t) {
   });
 }
 
+/* 必要な現金（生活防衛資金＋目先の大型出費）と、余力の算定 */
+function computeNeeds() {
+  const monthly = (+$("iMonthly").value) * 10000;   // 万円 → 円
+  const months  = +$("iMonths").value;
+  const nearTerm = (+$("iNear").value) * 10000;
+  const emergency = monthly * months;
+  const necessary = emergency + nearTerm;
+  return { monthly, months, nearTerm, emergency, necessary };
+}
+
+const manen = v => Math.round(v / 10000).toLocaleString() + "万円";
+
+function renderNeeds(nd) {
+  const cash = state.cash;
+  const cov = nd.necessary > 0 ? cash / nd.necessary : 1;
+  const over = cash - nd.necessary;
+  const fillPct = clamp(cov * 100, 0, 100);
+  const fillColor = cov >= 1 ? "#6fae6a" : "#e0a36a";
+
+  $("vMonthly").textContent = (nd.monthly / 10000) + "万/月";
+  $("vMonths").textContent = nd.months + "ヶ月分";
+  $("vNear").textContent = manen(nd.nearTerm);
+
+  const verdict = cov >= 1
+    ? `<div class="needs-verdict ok">✅ 土台クリア｜投資にまわせる余力 ${manen(Math.max(0, over))}</div>
+       <div class="needs-note">余力は木を育てる種。つみたて投資にまわせます。</div>`
+    : `<div class="needs-verdict short">⚠️ 土台の現金があと ${manen(nd.necessary - cash)} 不足</div>
+       <div class="needs-note">まず現金で土台（根）を固めると、暴落にも倒れにくくなります。</div>`;
+
+  $("needsResult").innerHTML =
+    `<div class="needs-row"><span class="lab">生活防衛資金（${nd.months}ヶ月）</span><span class="num">${manen(nd.emergency)}</span></div>` +
+    `<div class="needs-row"><span class="lab">目先3年の大型出費</span><span class="num">${manen(nd.nearTerm)}</span></div>` +
+    `<div class="needs-row"><span class="lab">必要な現金 合計</span><span class="num">${manen(nd.necessary)}</span></div>` +
+    `<div class="needs-bar"><div class="fill" style="width:${fillPct}%;background:${fillColor}"></div></div>` +
+    `<div class="needs-row"><span class="lab">いまの現金（MRF等含む）</span><span class="num">${manen(cash)}</span></div>` +
+    verdict;
+}
+
+function renderCashBadge(nd) {
+  const cash = state.cash;
+  const cov = nd.necessary > 0 ? cash / nd.necessary : 1;
+  const el = $("cashBadge");
+  if (cov >= 1) {
+    el.className = "cash-badge ok";
+    el.innerHTML = `<div class="cb-title">🌱 投資にまわせる余力 <span class="amt-y">${manen(Math.max(0, cash - nd.necessary))}</span></div>`
+      + `<div>土台（生活防衛＋目先の出費）はクリア。余力で木を育てられます。</div>`;
+  } else {
+    el.className = "cash-badge short";
+    el.innerHTML = `<div class="cb-title">⚠️ 土台の現金が <span class="amt-s">${manen(nd.necessary - cash)}</span> 不足</div>`
+      + `<div>まず生活防衛資金を確保すると、根が安定します。</div>`;
+  }
+}
+
 function renderAll() {
   const t = deriveTree(state);
+  // 必要現金と余力 → 根のボリュームに反映
+  const nd = computeNeeds();
+  t.cash = state.cash;
+  t.necessaryCash = nd.necessary;
+  t.cashCoverage = nd.necessary > 0 ? state.cash / nd.necessary : 1;
+  t.excessCash = Math.max(0, state.cash - nd.necessary);
+
   $("treeHost").innerHTML = buildTree(t);
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
   renderMetrics(t);
+  renderNeeds(nd);
+  renderCashBadge(nd);
   // slider value labels
   $("vAge").textContent = state.age + "歳";
   $("vYears").textContent = state.years.toFixed(1) + "年";
@@ -909,6 +1026,10 @@ function renderAll() {
 // スライダー配線
 ["sAge","sYears","sDiv","sEq","sBond","sOther","sCash"].forEach(id => {
   $(id).addEventListener("input", readSliders);
+});
+// 現金の土台（必要現金）の入力 → 再描画のみ（保有データは変えない）
+["iMonthly","iMonths","iNear"].forEach(id => {
+  $(id).addEventListener("input", renderAll);
 });
 $("resetBtn").addEventListener("click", () => selectProfile(activeId));
 
