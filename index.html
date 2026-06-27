@@ -694,15 +694,16 @@ function buildTree(t) {
     t.isFork = true;
     const ew = Math.max(3, t.equityGirth * gs);   // 株の主枝＝分散度で太さが決まる
     const bw = Math.max(3, t.bondGirth * gs);     // 債券の主枝＝量で太さが決まる
-    // 幹は2本の主枝の合計とほぼ同じ太さ＝分岐部で段差なく滑らかにつながる
-    const trunkW = Math.max((ew + bw) * 0.92, Math.max(ew, bw) * 1.1);
-    newTrunkVisW = trunkW * 1.2;
+    // 幹は主枝とほぼ同じ細さ。分岐部は主枝を幹の内側に埋め込んで滑らかにつなぐ。
+    const trunkW = Math.max((ew + bw) * 0.6, Math.max(ew, bw) * 1.05);
+    newTrunkVisW = trunkW * 1.25;
     const Lf = t.H * 0.34;
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
-    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.2, fx, fy, trunkW)}"/>`;
-    // 主枝の起点を幹の少し内側（下）に埋め込み、分岐が幹の中から始まるように＝段差を消す
-    const sx = fx, syF = fy + Math.min(22, Lf * 0.2);
+    // 主枝の起点を幹の内側（下）に深めに埋め込み、分岐が幹の中から始まるように＝段差を消す
+    const sx = fx, syF = fy + Math.min(40, Lf * 0.34);
+    // 幹は根元フレア→上端を主枝より細く。主枝が幹を覆って自然に張り出し、段差を消す。
+    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.25, sx, syF, trunkW * 0.66)}"/>`;
     // 保有比率（金額）で枝葉の量感をスケール。50:50で同じ大きさ。
     const SB = t.equity + t.bond;
     const eqShare = SB > 0 ? t.equity / SB : 0.5, bdShare = 1 - eqShare;
