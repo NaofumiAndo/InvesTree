@@ -632,7 +632,7 @@ function buildTree(t) {
   const depth = clamp(Math.round(2 + t.H / 90), 2, 5);   // 樹齢が高いほど枝分かれが多い
   const trunkAng = Math.PI / 2 - wind * 0.10;            // 根元のわずかな傾き
   const tintEq = { main: greenMain, dk: greenDk };
-  const tintBd = { main: "#7bbf86", dk: "#5aa06a" };
+  const tintBd = { main: "#5fb4ab", dk: "#4a988e" };   // 債券＝はっきり青緑（ティール）で株と区別
   const baseBucket = { br: "", lf: "" }, eqBucket = { br: "", lf: "" }, bdBucket = { br: "", lf: "" };
 
   if (t.forkRatio <= 0.02) {
@@ -708,6 +708,22 @@ function buildTree(t) {
     // 奥（上）→手前（下）の順に描いて重なりを自然に
     placed.sort((a, b) => a.gy - b.gy);
     for (const pl of placed) pots += pottedPlant(pl.x, pl.gy, pl.s, pl.hue);
+  }
+
+  // うっすらラベル：株／債券／その他（どこを押せばよいかの目印・クリックは透過）
+  let labels = "";
+  const tSty = `text-anchor="middle" font-weight="700" pointer-events="none" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.2" stroke-linejoin="round" style="font-family:inherit"`;
+  const lY = GROUND - clamp(t.H * 0.72, 72, 300);
+  const lOff = Math.max(66, t.H * 0.30);
+  const lfs = clamp(t.H * 0.07, 13, 21).toFixed(0);
+  if (t.isFork) {
+    labels += `<text x="${f1(CX - lOff)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
+    labels += `<text x="${f1(CX + lOff)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#1f7d70" opacity="0.66">債券</text>`;
+  } else {
+    labels += `<text x="${f1(CX)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
+  }
+  if (t.otherShare > 0.001) {
+    labels += `<text x="${f1(CX - 88)}" y="${f1(GROUND - 22)}" ${tSty} font-size="13" fill="#a4633a" opacity="0.8">その他</text>`;
   }
 
   // 根（現金）：必要な土台（生活防衛資金＋目先の出費）を満たすとちょうど健やか。
@@ -799,6 +815,9 @@ function buildTree(t) {
 
     <!-- その他資産＝足元の鉢植え（木とは別物・揺れない） -->
     <g class="hit" data-part="other">${pots}</g>
+
+    <!-- うっすらラベル（株／債券／その他） -->
+    ${labels}
   </svg>`;
   return svg;
 }
