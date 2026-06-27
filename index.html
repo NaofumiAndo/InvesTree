@@ -558,13 +558,6 @@ function leafCluster(cx, cy, r, hue) {
   return s;
 }
 
-function twig(x0, y0, ang, len, sway) {
-  const x1 = x0 + Math.cos(ang) * len + sway;
-  const y1 = y0 - Math.sin(ang) * len;
-  const cx = x0 + Math.cos(ang) * len * 0.5 + sway * 0.4;
-  const cy = y0 - Math.sin(ang) * len * 0.5;
-  return { x1, y1, path: `M ${x0} ${y0} Q ${cx} ${cy} ${x1} ${y1}` };
-}
 
 function buildTree(t) {
   const wind = t.wind;
@@ -579,7 +572,6 @@ function buildTree(t) {
 
   let branchPaths = "";
   let leaves = "";
-  let twigs = "";
 
   const baseY = GROUND;
   const f1 = n => n.toFixed(1);
@@ -669,16 +661,48 @@ function buildTree(t) {
   const trunkSVG =
     `<g class="hit" data-part="trunk" fill="url(#barkE)" stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round">${branchPaths}</g>`;
 
-  // その他資産＝枝先に咲く花・実（彩り役）。過大なら枝先を埋め尽くし「頭でっかち」に
-  if (t.otherShare > 0.001 && tips.length) {
-    const sorted = tips.slice().sort((a, b) => a.y - b.y);   // 上の枝先から
-    const n = clamp(Math.round(t.otherShare * tips.length * 1.1), 1, tips.length);
-    const colors = ["#e6a4c0", "#f4c95d", "#c79be0", "#e88f6f"];
-    const r = 4 + t.otherShare * 5;
-    for (let i = 0; i < n; i++) {
-      const tp = sorted[i % sorted.length];
-      twigs += `<circle cx="${f1(tp.x + (rng()-0.5)*12)}" cy="${f1(tp.y + (rng()-0.5)*12)}" r="${f1(r)}" fill="${colors[i % colors.length]}"/>`;
+  // その他資産（REIT・金・暗号資産等）＝木とは別物。足元に置く「鉢植え」で表す。
+  // 過大だと鉢が増えて大きくなり、本体の木より目立つ＝偏りの警告に。
+  function pottedPlant(x, gy, s, hue) {
+    const wTop = 24 * s, wBot = 16 * s, h = 19 * s;
+    const rimW = wTop * 1.22, rimH = 5 * s;
+    const top = gy - 2, px = x, py = top - rimH;
+    let g = "";
+    // 葉（鉢のうしろ側）
+    const leafCol = [hue, "#5e9a59", "#7cbf86"];
+    const stems = 5;
+    for (let i = 0; i < stems; i++) {
+      const ang = (-Math.PI / 2) + (i - (stems - 1) / 2) * 0.44;
+      const len = (15 + 7 * rng()) * s;
+      const lx = px + Math.cos(ang) * len, ly = py + Math.sin(ang) * len;
+      g += `<path d="M ${f1(px)} ${f1(py)} Q ${f1((px+lx)/2)} ${f1((py+ly)/2 - 4*s)} ${f1(lx)} ${f1(ly)}" stroke="#5e9a59" stroke-width="${f1(1.4*s)}" fill="none" stroke-linecap="round"/>`;
+      g += `<ellipse cx="${f1(lx)}" cy="${f1(ly)}" rx="${f1(7*s)}" ry="${f1(4*s)}" fill="${leafCol[i % leafCol.length]}" transform="rotate(${(ang*180/Math.PI+90).toFixed(1)} ${f1(lx)} ${f1(ly)})"/>`;
     }
+    // 鉢（テラコッタ）
+    g += `<path d="M ${f1(px-wTop/2)} ${f1(top)} L ${f1(px+wTop/2)} ${f1(top)} L ${f1(px+wBot/2)} ${f1(top+h)} L ${f1(px-wBot/2)} ${f1(top+h)} Z" fill="#c98a5f"/>`;
+    g += `<path d="M ${f1(px+wTop/2-3.2*s)} ${f1(top)} L ${f1(px+wBot/2-2*s)} ${f1(top+h)} L ${f1(px+wBot/2)} ${f1(top+h)} L ${f1(px+wTop/2)} ${f1(top)} Z" fill="rgba(0,0,0,0.10)"/>`;
+    g += `<rect x="${f1(px-rimW/2)}" y="${f1(py)}" width="${f1(rimW)}" height="${f1(rimH+2)}" rx="${f1(2*s)}" fill="#d89a6e"/>`;
+    return `<g>${g}</g>`;
+  }
+
+  let pots = "";
+  if (t.otherShare > 0.001) {
+    const n = clamp(Math.ceil(t.otherShare * 8), 1, 5);     // 比率が高いほど鉢が増える
+    const baseScale = 0.72 + t.otherShare * 0.95;           // 比率が高いほど鉢が大きい
+    const hues = ["#6fae6a", "#7cbf86", "#88b36a"];
+    const placed = [];
+    for (let i = 0; i < n; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const ring = Math.floor(i / 2);
+      const dist = 82 + ring * 50 + (rng() - 0.5) * 12;
+      const x = CX + side * dist;
+      const s = baseScale * (1 - ring * 0.1) * (0.92 + rng() * 0.16);
+      const gy = GROUND + 8 + ring * 5;                     // 手前ほど少し下＝奥行き
+      placed.push({ x, gy, s, hue: hues[i % hues.length] });
+    }
+    // 奥（上）→手前（下）の順に描いて重なりを自然に
+    placed.sort((a, b) => a.gy - b.gy);
+    for (const pl of placed) pots += pottedPlant(pl.x, pl.gy, pl.s, pl.hue);
   }
 
   // 根（現金）：必要な土台（生活防衛資金＋目先の出費）を満たすとちょうど健やか。
@@ -754,36 +778,16 @@ function buildTree(t) {
     <!-- 木の影 -->
     <ellipse cx="${CX+10}" cy="${GROUND+10}" rx="${90 + t.H*0.1}" ry="14" fill="rgba(90,70,40,0.16)"/>
 
-    <!-- 揺れるグループ（幹＋枝＋葉） -->
+    <!-- 揺れるグループ（幹＋葉） -->
     <g class="sway" style="transform-origin:${CX}px ${GROUND}px;">
       ${trunkSVG}
       <g class="hit" data-part="leaves">${leaves}</g>
-      <g class="hit" data-part="branches">${twigs}</g>
     </g>
+
+    <!-- その他資産＝足元の鉢植え（木とは別物・揺れない） -->
+    <g class="hit" data-part="other">${pots}</g>
   </svg>`;
   return svg;
-}
-
-function buildTwigs(t, fromX, fromY, topX, topY, windLean) {
-  const share = t.otherShare;
-  if (share <= 0.001) return "";
-  const n = clamp(Math.round(share * 18), 1, 10);
-  const colors = ["#e6a4c0", "#f4c95d", "#c79be0", "#e88f6f"]; // 花・実の彩り
-  let s = "";
-  for (let i = 0; i < n; i++) {
-    const f = i / Math.max(1, n - 1);
-    // その他が過大なら上部に集中して「頭でっかち」に
-    const ax = topX + (fromX - topX) * (share > 0.5 ? f * 0.35 : f);
-    const ay = topY + (fromY - topY) * (share > 0.5 ? f * 0.35 : f);
-    const dir = i % 2 === 0 ? 1 : -1;
-    const ang = (Math.PI/2) + dir * (0.5 + 0.5 * Math.random()) ;
-    const len = 24 + share * 52;
-    const tg = twig(ax, ay, ang, len, windLean * 0.6 * f);
-    s += `<path d="${tg.path}" stroke="#8a6b46" stroke-width="${1.6 + share}" fill="none" stroke-linecap="round"/>`;
-    const c = colors[i % colors.length];
-    s += `<circle cx="${tg.x1}" cy="${tg.y1}" r="${4 + share*6}" fill="${c}"/>`;
-  }
-  return s;
 }
 
 /* =========================================================================
@@ -801,10 +805,10 @@ function explain(part, t) {
       return `<b>債券の幹</b><br>債券（${yen(t.bond)}）を組み入れると、根元から2本目の幹が育ちます。株の幹と支え合って自立し、重心が下がって風に強くなります。`;
     case "base":
       return `<b>二股の付け根</b><br>株と債券、2つの資産クラスがここで支え合っています。左右の太さの比率が、ほぼ半々になると一番安定して美しく見えます。`;
-    case "branches":
+    case "other":
       return t.otherShare > 0.5
-        ? `<b>小枝（その他資産が過大）</b><br>REITや暗号資産などが大半で、枝ばかり茂って幹がスカスカ。頭でっかちで不安定です。主構造（幹）を太らせましょう。`
-        : `<b>小枝・彩り</b><br>REITや金などの「その他資産」。花や実のように彩りを添えますが、主構造（幹）は支えません。少量がちょうどよい塩梅です。`;
+        ? `<b>足元の鉢植え（その他資産が過大）</b><br>REIT・金・暗号資産などの「別枠」が大きすぎて、本体の木より鉢が目立っています。値動きの激しいものは脇役に留め、幹（コア資産）を育てましょう。`
+        : `<b>足元の鉢植え（その他資産）</b><br>REIT・金・暗号資産など。木の幹とは別に、足元で育てる脇役です。少量ならポートフォリオに彩りと分散を添えます。`;
     case "leaves":
       return `<b>葉の茂り</b><br>評価額や含み益のあらわれ。続けるほど青々と茂ります。下落局面でも色が少しくすむ程度に留めます。`;
     case "roots": {
