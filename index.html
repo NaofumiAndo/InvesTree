@@ -602,19 +602,26 @@ function buildTree(t) {
     }
   }
 
-  // 根（現金）
+  // 根（現金・生活防衛資金）：現金比率が高いほど深く広く張る。
+  // 半分(0.5)を超えると急に大きくなる非線形カーブで「根がでかすぎる」を表現。
   const rootDepth = t.rootDepth;
-  const rootLen = 18 + rootDepth * 90;
+  const rootMag = rootDepth * 1.1 + Math.max(0, rootDepth - 0.5) * 2.6; // 0〜約2.4
+  const rootLen = 16 + rootMag * 98;
+  const rootW = 3 + rootMag * 7.5;
   let roots = "";
-  const rootAngs = [200, 230, 270, 310, 340];
+  const rootAngs = [205, 230, 251, 270, 289, 310, 335];
   for (let i = 0; i < rootAngs.length; i++) {
+    // 現金が少ないうちは本数を絞り、多いほど太く広く張り出す
+    if (rootDepth < 0.22 && (i % 2 === 1)) continue;
     const a = rootAngs[i] * Math.PI / 180;
-    const len = rootLen * (0.6 + ((i % 2) ? 0.4 : 0.25));
-    const x1 = CX + Math.cos(a) * len * 0.7;
-    const y1 = GROUND - Math.sin(a) * len; // sin負→下向き
-    const cx = CX + Math.cos(a) * len * 0.35;
-    const cy = GROUND - Math.sin(a) * len * 0.4;
-    roots += `<path d="M ${CX} ${GROUND-2} Q ${cx} ${cy} ${x1} ${y1}" stroke="#b98f5e" stroke-width="${3 + rootDepth*5}" fill="none" stroke-linecap="round" opacity="0.85"/>`;
+    const jitter = 0.72 + ((i * 7) % 5) / 11;     // 0.72〜1.08（決定的）
+    const len = rootLen * jitter;
+    const x1 = CX + Math.cos(a) * len * 1.08;       // 横に広く張る
+    const y1 = GROUND - Math.sin(a) * len * 0.58;   // 縦は控えめ（枠内に収める）
+    const cx = CX + Math.cos(a) * len * 0.46;
+    const cy = GROUND - Math.sin(a) * len * 0.26 + 5;
+    const w = rootW * (0.55 + 0.45 * (1 - i / rootAngs.length));
+    roots += `<path d="M ${f1(CX)} ${f1(GROUND-2)} Q ${f1(cx)} ${f1(cy)} ${f1(x1)} ${f1(y1)}" stroke="#b98f5e" stroke-width="${f1(w)}" fill="none" stroke-linecap="round" opacity="0.85"/>`;
   }
 
   // 風のガスト線（強風時）
