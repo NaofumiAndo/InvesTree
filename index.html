@@ -199,6 +199,20 @@
   }
   .bubble.show { opacity: 1; transform: translateY(0); }
   .bubble b { color: var(--accent-dk); }
+  /* クリックで出る投資の内訳 */
+  .bubble .bd-head {
+    display: flex; justify-content: space-between; gap: 12px;
+    font-weight: 700; font-size: 13px;
+    padding-bottom: 5px; margin-bottom: 5px;
+    border-bottom: 1px solid #ecdfc8;
+  }
+  .bubble .bd-head .bd-total { color: var(--ink); }
+  .bubble .bd-row {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 2px 0; font-size: 12px;
+  }
+  .bubble .bd-nm { color: var(--ink-soft); }
+  .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
 
   /* side panel */
   .panel {
@@ -561,9 +575,6 @@ function buildTree(t) {
   const greenMain = wind > 0.55 ? "#8fae7a" : "#79b46f"; // 暴風は少しくすむ
   const greenDk = "#5e9a59";
 
-  let branchPaths = "";
-  let leaves = "";
-
   const baseY = GROUND;
   const f1 = n => n.toFixed(1);
 
@@ -592,28 +603,29 @@ function buildTree(t) {
   const windPerLv  = -wind * 0.16;  // 1段ごとに風で少しずつ傾く（上ほど大きくしなる）
 
   // 再帰的な枝分かれ（L-system 的）。一度二股なら先もずっと二股に分かれる。
-  function grow(x, y, ang, len, w, depth, tint) {
+  // bucket.br に枝、bucket.lf に葉を貯める（株・債券・幹を別グループにして色分け＆内訳表示）
+  function grow(x, y, ang, len, w, depth, tint, bucket) {
     const ex = x + Math.cos(ang) * len;
     const ey = y - Math.sin(ang) * len;
     const tipW = Math.max(1.2, w * widthDecay);
-    branchPaths += `<path d="${branchPath(x, y, w, ex, ey, tipW)}"/>`;
+    bucket.br += `<path d="${branchPath(x, y, w, ex, ey, tipW)}"/>`;
     if (depth <= 0) {
       tips.push({ x: ex, y: ey });
       const r = 13 + w * 1.8 + lush * 6;
-      leaves += leafCluster(ex, ey - r * 0.12, r, tint.main);
-      leaves += leafCluster(ex - r * 0.42, ey + r * 0.22, r * 0.6, tint.dk);
+      bucket.lf += leafCluster(ex, ey - r * 0.12, r, tint.main);
+      bucket.lf += leafCluster(ex - r * 0.42, ey + r * 0.22, r * 0.6, tint.dk);
       return;
     }
     for (let i = 0; i < 2; i++) {                 // 二股
       const dir = i === 0 ? -1 : 1;
       let a = ang + dir * spreadAng * (0.75 + rng() * 0.5) + windPerLv + (rng() - 0.5) * 0.14;
       const l = len * lenDecay * (0.92 + rng() * 0.16);
-      grow(ex, ey, a, l, w * widthDecay, depth - 1, tint);
+      grow(ex, ey, a, l, w * widthDecay, depth - 1, tint, bucket);
     }
     // 太めの枝には中ほどから小枝を1本足してボリュームを出す
     if (w > 7 && depth >= 2 && rng() < 0.55) {
       const a = ang + (rng() - 0.5) * 0.5 + windPerLv;
-      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, tint);
+      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, tint, bucket);
     }
   }
 
@@ -621,6 +633,7 @@ function buildTree(t) {
   const trunkAng = Math.PI / 2 - wind * 0.10;            // 根元のわずかな傾き
   const tintEq = { main: greenMain, dk: greenDk };
   const tintBd = { main: "#7bbf86", dk: "#5aa06a" };
+  const baseBucket = { br: "", lf: "" }, eqBucket = { br: "", lf: "" }, bdBucket = { br: "", lf: "" };
 
   if (t.forkRatio <= 0.02) {
     /* ----- 1本幹（株式100%）----- */
@@ -628,29 +641,30 @@ function buildTree(t) {
     const W = Math.max(5, t.equityGirth);
     const Lf = t.H * 0.30;                                // しっかりした1本の幹
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
-    // 根元の末広がり（フレア）付きの下部幹
-    branchPaths += `<path d="${branchPath(CX, baseY, W * 1.5, fx, fy, W)}"/>`;
-    // 幹の先から再帰的に枝分かれ
-    grow(fx, fy, trunkAng, t.H * 0.22, W, depth, tintEq);
+    baseBucket.br += `<path d="${branchPath(CX, baseY, W * 1.5, fx, fy, W)}"/>`;  // 末広がりの根元
+    grow(fx, fy, trunkAng, t.H * 0.22, W, depth, tintEq, eqBucket);
   } else {
     /* ----- 二股（株 + 債券）：1本の幹から株(左)・債券(右)の2本に分かれる ----- */
     t.isFork = true;
     const ew = Math.max(5, t.equityGirth);   // 株の主枝＝分散度で太さが決まる
     const bw = Math.max(5, t.bondGirth);     // 債券の主枝＝量で太さが決まる
-    // 幹は2本の主枝より太い（親＞子）
-    const trunkW = Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);
-    const Lf = t.H * 0.34;                                // 下部はしっかり1本立つ
+    const trunkW = Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);  // 幹は主枝より太い
+    const Lf = t.H * 0.34;
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
-    branchPaths += `<path d="${branchPath(CX, baseY, trunkW * 1.4, fx, fy, trunkW)}"/>`;
-    // 株の主枝（左）と債券の主枝（右）
-    grow(fx, fy, trunkAng + 0.34, t.H * 0.24, ew, depth, tintEq);
-    grow(fx, fy, trunkAng - 0.30, t.H * 0.24, bw, depth, tintBd);
+    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.4, fx, fy, trunkW)}"/>`;
+    grow(fx, fy, trunkAng + 0.34, t.H * 0.24, ew, depth, tintEq, eqBucket);  // 株（左）
+    grow(fx, fy, trunkAng - 0.30, t.H * 0.24, bw, depth, tintBd, bdBucket);  // 債券（右）
   }
 
-  // 幹・枝をまとめて1つのクリック領域に（タップ位置で株/債券/付け根を判定）
-  const trunkSVG =
-    `<g class="hit" data-part="trunk" fill="url(#barkE)" stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round">${branchPaths}</g>`;
+  // 枝は株(緑みの茶)／債券(暖かい茶)でうっすら色分け＆クリックで内訳。
+  // 樹冠の葉は左右が混ざるので1グループにまとめ、クリックすると全体の内訳を表示。
+  const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
+  let trunkSVG = "";
+  trunkSVG += `<g class="hit" data-part="base" fill="url(#barkE)" ${strk}>${baseBucket.br}</g>`;
+  trunkSVG += `<g class="hit" data-part="equity" fill="url(#barkEq)" ${strk}>${eqBucket.br}</g>`;
+  if (bdBucket.br) trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkBd)" ${strk}>${bdBucket.br}</g>`;
+  const leavesSVG = `<g class="hit" data-part="leaves" stroke="none">${eqBucket.lf}${bdBucket.lf}</g>`;
 
   // その他資産（REIT・金・暗号資産等）＝木とは別物。足元に置く「鉢植え」で表す。
   // 過大だと鉢が増えて大きくなり、本体の木より目立つ＝偏りの警告に。
@@ -736,6 +750,14 @@ function buildTree(t) {
       <linearGradient id="barkE" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
         <stop offset="0" stop-color="#8c6238"/><stop offset="0.5" stop-color="#a87a4a"/><stop offset="1" stop-color="#c0986090"/>
       </linearGradient>
+      <!-- 株の枝：ほんのり緑みのある茶 -->
+      <linearGradient id="barkEq" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
+        <stop offset="0" stop-color="#806a34"/><stop offset="0.5" stop-color="#9c8848"/><stop offset="1" stop-color="#b29a5e90"/>
+      </linearGradient>
+      <!-- 債券の枝：ほんのり暖かみのある茶 -->
+      <linearGradient id="barkBd" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
+        <stop offset="0" stop-color="#9c7240"/><stop offset="0.5" stop-color="#bd9056"/><stop offset="1" stop-color="#d4ad6e90"/>
+      </linearGradient>
       <linearGradient id="barkB" x1="0" y1="1" x2="0" y2="0">
         <stop offset="0" stop-color="#8c6438"/><stop offset="1" stop-color="#a87b4c"/>
       </linearGradient>
@@ -772,7 +794,7 @@ function buildTree(t) {
     <!-- 揺れるグループ（幹＋葉） -->
     <g class="sway" style="transform-origin:${CX}px ${GROUND}px;">
       ${trunkSVG}
-      <g class="hit" data-part="leaves">${leaves}</g>
+      ${leavesSVG}
     </g>
 
     <!-- その他資産＝足元の鉢植え（木とは別物・揺れない） -->
@@ -784,34 +806,43 @@ function buildTree(t) {
 /* =========================================================================
    タップ解説（§5）— 状態に応じて文面を動的生成
    ========================================================================= */
-function explain(part, t) {
-  const yen = v => "約" + Math.round(v/10000).toLocaleString() + "万円";
+// クリックされたパーツの「投資の内訳」を返す（株＝左の枝・債券＝右の枝・鉢＝その他）
+function breakdownHTML(part, t) {
+  const yen = v => "¥" + Math.round(v).toLocaleString();
+  const p = currentProfile();
+  const itemsOf = cls => (!custom ? p.holdings.filter(h => h.assetClass === cls) : []);
+  const head = (label, total, accent) =>
+    `<div class="bd-head" style="color:${accent || 'var(--ink)'}">${label}<span class="bd-total">${yen(total)}</span></div>`;
+  const rowsFor = (cls, fallbackLabel, fallbackAmt) => {
+    const list = itemsOf(cls);
+    if (list.length) return list.map(h =>
+      `<div class="bd-row"><span class="bd-nm">${h.name}</span><span class="bd-amt">${yen(h.amount)}</span></div>`).join("");
+    return `<div class="bd-row"><span class="bd-nm">${fallbackLabel}</span><span class="bd-amt">${yen(fallbackAmt)}</span></div>`;
+  };
   switch (part) {
-    case "equity": {
-      if (t.equityGirth < 16)
-        return `<b>株式の幹（細い）</b><br>1銘柄に集中しているので、木質化せず頼りない幹です。風に弱く折れそう。投信やインデックスで分散すると、どっしり太く育ちます。`;
-      return `<b>株式の幹（太い）</b><br>たくさんの銘柄に分散しているので、しっかり木質化した安定した幹です。多少の風ではびくともしません。`;
-    }
+    case "equity":
+      return head("🌳 株式", state.equity, "#4f8a52") + rowsFor("equity", "株式", state.equity);
     case "bond":
-      return `<b>債券の幹</b><br>債券（${yen(t.bond)}）を組み入れると、根元から2本目の幹が育ちます。株の幹と支え合って自立し、重心が下がって風に強くなります。`;
-    case "base":
-      return `<b>二股の付け根</b><br>株と債券、2つの資産クラスがここで支え合っています。左右の太さの比率が、ほぼ半々になると一番安定して美しく見えます。`;
+      return head("🌿 債券", state.bond, "#a9803b") + rowsFor("bond", "債券", state.bond);
     case "other":
-      return t.otherShare > 0.5
-        ? `<b>足元の鉢植え（その他資産が過大）</b><br>REIT・金・暗号資産などの「別枠」が大きすぎて、本体の木より鉢が目立っています。値動きの激しいものは脇役に留め、幹（コア資産）を育てましょう。`
-        : `<b>足元の鉢植え（その他資産）</b><br>REIT・金・暗号資産など。木の幹とは別に、足元で育てる脇役です。少量ならポートフォリオに彩りと分散を添えます。`;
-    case "leaves":
-      return `<b>葉の茂り</b><br>評価額や含み益のあらわれ。続けるほど青々と茂ります。下落局面でも色が少しくすむ程度に留めます。`;
+      return head("🪴 その他資産", state.other, "#c2703a") + rowsFor("other", "その他", state.other);
     case "roots": {
-      const cov = t.cashCoverage != null ? t.cashCoverage : 1;
-      if (cov < 0.95)
-        return `<b>根（浅い・土台が不足）</b><br>生活防衛資金や目先の出費に対して現金が足りません。根が浅いと強風や干ばつ（暴落）で倒れやすい状態。まず現金で土台を固めましょう。`;
-      if (cov > 1.6)
-        return `<b>根（大きすぎる）</b><br>必要な土台はもう十分。これ以上の現金は地中で眠る「遊んでいるお金」です。余力（${yen(Math.max(0,(t.excessCash||0)))}）は木を育てる種＝投資にまわせます。`;
-      return `<b>根（ちょうどよい土台）</b><br>生活防衛資金と目先の出費をしっかりカバー。深い根は暴落にも耐える安心の土台です。これ以上の現金は投資にまわす余力になります。`;
+      const cash = state.cash, nec = t.necessaryCash || 0, over = t.excessCash || 0;
+      let s = head("🌱 現金（土台）", cash, "#5b8f5b");
+      s += `<div class="bd-row"><span class="bd-nm">必要な土台</span><span class="bd-amt">${yen(nec)}</span></div>`;
+      s += over > 0
+        ? `<div class="bd-row"><span class="bd-nm">投資にまわせる余力</span><span class="bd-amt">${yen(over)}</span></div>`
+        : `<div class="bd-row"><span class="bd-nm">不足</span><span class="bd-amt">${yen(Math.max(0, nec - cash))}</span></div>`;
+      return s;
     }
-    default:
-      return "";
+    default: { // 幹(base)・葉(leaves) ＝ ポートフォリオ全体
+      const total = state.equity + state.bond + state.other;
+      return head("ポートフォリオ全体", total) +
+        `<div class="bd-row"><span class="bd-nm">🌳 株式</span><span class="bd-amt">${yen(state.equity)}</span></div>` +
+        `<div class="bd-row"><span class="bd-nm">🌿 債券</span><span class="bd-amt">${yen(state.bond)}</span></div>` +
+        `<div class="bd-row"><span class="bd-nm">🪴 その他</span><span class="bd-amt">${yen(state.other)}</span></div>` +
+        `<div class="bd-row"><span class="bd-nm">🌱 現金</span><span class="bd-amt">${yen(state.cash)}</span></div>`;
+    }
   }
 }
 
@@ -917,20 +948,8 @@ function attachTreeInteractions(t) {
   svg.querySelectorAll(".hit").forEach(el => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      let part = el.getAttribute("data-part");
-      const rectS = svg.getBoundingClientRect();
-      const localX = (e.clientX - rectS.left) / rectS.width * VW;
-      const localY = (e.clientY - rectS.top) / rectS.height * VH;
-      // 連続シルエットの幹は、タップ位置で 株/債券/股 を判定
-      if (part === "trunk") {
-        if (t.isFork) {
-          if (localY > t.forkY - 10) part = "base";        // 股より下＝合流部
-          else part = localX < CX ? "equity" : "bond";     // 左＝株, 右＝債券
-        } else {
-          part = "equity";
-        }
-      }
-      const html = explain(part, t);
+      const part = el.getAttribute("data-part");
+      const html = breakdownHTML(part, t);
       if (!html) return;
       bubble.innerHTML = html;
       // バブルを表示位置へ
