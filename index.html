@@ -645,14 +645,15 @@ function buildTree(t) {
 
   // 再帰的な枝分かれ（L-system 的）。一度二股なら先もずっと二股に分かれる。
   // bucket.br に枝、bucket.lf に葉を貯める（株・債券・幹を別グループにして色分け＆内訳表示）
-  function grow(x, y, ang, len, w, depth, tint, bucket) {
+  function grow(x, y, ang, len, w, depth, tint, bucket, leafScale) {
+    const ls = leafScale != null ? leafScale : 1;   // 保有比率で葉の量感を変える
     const ex = x + Math.cos(ang) * len;
     const ey = y - Math.sin(ang) * len;
     const tipW = Math.max(1.2, w * widthDecay);
     bucket.br += `<path d="${branchPath(x, y, w, ex, ey, tipW)}"/>`;
     if (depth <= 0) {
       tips.push({ x: ex, y: ey });
-      const r = 13 + w * 1.8 + lush * 6;
+      const r = (12 + w * 1.6 + lush * 6) * ls;
       bucket.lf += leafCluster(ex, ey - r * 0.12, r, tint.main);
       bucket.lf += leafCluster(ex - r * 0.42, ey + r * 0.22, r * 0.6, tint.dk);
       return;
@@ -661,12 +662,12 @@ function buildTree(t) {
       const dir = i === 0 ? -1 : 1;
       let a = ang + dir * spreadAng * (0.75 + rng() * 0.5) + windPerLv + (rng() - 0.5) * 0.14;
       const l = len * lenDecay * (0.92 + rng() * 0.16);
-      grow(ex, ey, a, l, w * widthDecay, depth - 1, tint, bucket);
+      grow(ex, ey, a, l, w * widthDecay, depth - 1, tint, bucket, ls);
     }
     // 太めの枝には中ほどから小枝を1本足してボリュームを出す
     if (w > 7 && depth >= 2 && rng() < 0.55) {
       const a = ang + (rng() - 0.5) * 0.5 + windPerLv;
-      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, tint, bucket);
+      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, tint, bucket, ls);
     }
   }
 
@@ -693,15 +694,24 @@ function buildTree(t) {
     t.isFork = true;
     const ew = Math.max(3, t.equityGirth * gs);   // 株の主枝＝分散度で太さが決まる
     const bw = Math.max(3, t.bondGirth * gs);     // 債券の主枝＝量で太さが決まる
-    const trunkW = Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);  // 幹は主枝より太い
-    newTrunkVisW = trunkW * 1.4;
+    // 幹は2本の主枝の合計とほぼ同じ太さ＝分岐部で段差なく滑らかにつながる
+    const trunkW = Math.max((ew + bw) * 0.92, Math.max(ew, bw) * 1.1);
+    newTrunkVisW = trunkW * 1.2;
     const Lf = t.H * 0.34;
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
-    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.4, fx, fy, trunkW)}"/>`;
-    // 株は手前・債券は奥。重なりで奥行きを出すため開きは控えめ、債券は少し高く後ろへ。
-    grow(fx, fy, trunkAng - 0.16, t.H * 0.28, bw, depth, tintBd, bdBucket);  // 債券（奥・やや高い）
-    grow(fx, fy, trunkAng + 0.17, t.H * 0.24, ew, depth, tintEq, eqBucket);  // 株（手前）
+    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.2, fx, fy, trunkW)}"/>`;
+    // 主枝の起点を幹の少し内側（下）に埋め込み、分岐が幹の中から始まるように＝段差を消す
+    const sx = fx, syF = fy + Math.min(22, Lf * 0.2);
+    // 保有比率（金額）で枝葉の量感をスケール。50:50で同じ大きさ。
+    const SB = t.equity + t.bond;
+    const eqShare = SB > 0 ? t.equity / SB : 0.5, bdShare = 1 - eqShare;
+    const baseLen = t.H * 0.26;
+    const lenF = sh => 0.7 + 0.6 * sh;   // 0.5→1.0
+    const leafF = sh => 0.55 + 0.9 * sh; // 0.5→1.0
+    // 株は手前・債券は奥。開きは控えめにして重なりで奥行きを出す。
+    grow(sx, syF, trunkAng - 0.16, baseLen * lenF(bdShare), bw, depth, tintBd, bdBucket, leafF(bdShare));  // 債券（奥）
+    grow(sx, syF, trunkAng + 0.17, baseLen * lenF(eqShare), ew, depth, tintEq, eqBucket, leafF(eqShare));  // 株（手前）
   }
 
   const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
@@ -733,13 +743,14 @@ function buildTree(t) {
   // 枝は株(緑みの茶)／債券(暖かい茶)でうっすら色分け＆クリックで内訳。
   // 樹冠の葉は左右が混ざるので1グループにまとめ、クリックすると全体の内訳を表示。
   // 描画順＝奥行き：幹 → 債券(奥) → 株(手前)。それぞれ枝のあとに葉を重ねる。
+  // 幹・枝の色は統一して分岐点を滑らかに（株/債券の区別は葉の色＝手前の緑/奥の青緑）。
   let trunkSVG = "";
   trunkSVG += `<g class="hit" data-part="base" fill="url(#barkE)" ${strk}>${baseBucket.br}</g>`;
   if (bdBucket.br) {
-    trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkBd)" ${strk}>${bdBucket.br}</g>`;
+    trunkSVG += `<g class="hit" data-part="bond" fill="url(#barkE)" ${strk}>${bdBucket.br}</g>`;
     trunkSVG += `<g class="hit" data-part="bond" stroke="none">${bdBucket.lf}</g>`;
   }
-  trunkSVG += `<g class="hit" data-part="equity" fill="url(#barkEq)" ${strk}>${eqBucket.br}</g>`;
+  trunkSVG += `<g class="hit" data-part="equity" fill="url(#barkE)" ${strk}>${eqBucket.br}</g>`;
   trunkSVG += `<g class="hit" data-part="equity" stroke="none">${eqBucket.lf}</g>`;
   const leavesSVG = "";  // 葉は各資産グループに統合済み
 
