@@ -948,7 +948,13 @@ function attachTreeInteractions(t) {
   svg.querySelectorAll(".hit").forEach(el => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      const part = el.getAttribute("data-part");
+      let part = el.getAttribute("data-part");
+      // 樹冠（葉）はクリックした左右で 株／債券 に振り分ける（左＝株, 右＝債券）
+      if (part === "leaves") {
+        const rectS = svg.getBoundingClientRect();
+        const localX = (e.clientX - rectS.left) / rectS.width * VW;
+        part = (t.isFork && localX >= CX) ? "bond" : "equity";
+      }
       const html = breakdownHTML(part, t);
       if (!html) return;
       bubble.innerHTML = html;
