@@ -339,14 +339,9 @@
     </div>
 
     <div class="panel">
-      <details class="box" open>
-        <summary>保有商品 <span id="customTag"></span></summary>
-        <div id="holdings"></div>
-      </details>
-
-      <details class="box needs" open>
-        <summary>🪴 足元の安心（現金の土台）</summary>
-        <p class="needs-lead">生活防衛資金と目先の出費を満たす現金があるか、残りは投資にまわせる余力かを見ます。</p>
+      <details class="box needs">
+        <summary>① 🪴 足元の安心（流動性の確保）</summary>
+        <p class="needs-lead">まず生活防衛資金と目先の出費を現金で確保。満たせているか、残りは投資にまわせる余力かを見ます。</p>
         <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
         <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
         <label>生活防衛資金として確保する月数 <span class="v" id="vMonths"></span></label>
@@ -356,6 +351,10 @@
         <div id="needsResult" class="needs-result"></div>
       </details>
 
+      <details class="box">
+        <summary>② 🌳 保有商品（中長期の投資） <span id="customTag"></span></summary>
+        <div id="holdings"></div>
+      </details>
     </div>
   </div>
 
