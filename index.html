@@ -214,6 +214,30 @@
     color: var(--ink-soft);
     text-transform: none;
   }
+  /* 折りたたみ式カード */
+  details.box > summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--ink-soft);
+    user-select: none;
+  }
+  details.box > summary::-webkit-details-marker { display: none; }
+  details.box > summary::after {
+    content: "▾";
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--ink-soft);
+    transition: transform .15s ease;
+  }
+  details.box:not([open]) > summary::after { transform: rotate(-90deg); }
+  details.box[open] > summary { margin-bottom: 12px; }
+  details.box > summary .tag-custom { margin-left: 0; }
   .holding {
     display: flex;
     justify-content: space-between;
@@ -297,19 +321,14 @@
     </div>
 
     <div class="panel">
-      <div class="box">
-        <h2>保有商品 <span id="customTag"></span></h2>
+      <details class="box" open>
+        <summary>保有商品 <span id="customTag"></span></summary>
         <div id="holdings"></div>
-      </div>
+      </details>
 
-      <div class="box">
-        <h2>この木が表していること</h2>
-        <div class="metrics" id="metrics"></div>
-      </div>
-
-      <div class="box needs">
-        <h2>🪴 足元の安心（現金の土台）</h2>
-        <p class="needs-lead">まず生活防衛資金と目先の出費を確保。それを満たす現金があるか、残りは投資にまわせる余力かを見ます。</p>
+      <details class="box needs" open>
+        <summary>🪴 足元の安心（現金の土台）</summary>
+        <p class="needs-lead">生活防衛資金と目先の出費を満たす現金があるか、残りは投資にまわせる余力かを見ます。</p>
         <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
         <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
         <label>生活防衛資金として確保する月数 <span class="v" id="vMonths"></span></label>
@@ -317,10 +336,15 @@
         <label>3年以内に使う予定の大きな出費 <span class="v" id="vNear"></span></label>
         <input type="range" id="iNear" min="0" max="500" step="10" value="50">
         <div id="needsResult" class="needs-result"></div>
-      </div>
+      </details>
 
-      <div class="box sliders">
-        <h2>パラメータをいじって形の変化を見る</h2>
+      <details class="box">
+        <summary>この木が表していること</summary>
+        <div class="metrics" id="metrics"></div>
+      </details>
+
+      <details class="box sliders">
+        <summary>パラメータを調整（デモ）</summary>
         <label>年齢 <span class="v" id="vAge"></span></label>
         <input type="range" id="sAge" min="20" max="80" step="1">
         <label>積立継続年数 <span class="v" id="vYears"></span></label>
@@ -336,16 +360,16 @@
         <label>現金・MRF等の量（土台） <span class="v" id="vCash"></span></label>
         <input type="range" id="sCash" min="0" max="100" step="1">
         <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
-      </div>
+      </details>
 
-      <div class="box">
-        <h2>木が伝える3つの学び</h2>
+      <details class="box">
+        <summary>木が伝える3つの学び</summary>
         <ul class="learnings">
           <li>🌱 <b>長期積立</b> … 続けるほど木は高く育つ（樹高＝継続年数）</li>
           <li>🪵 <b>分散</b> … 1銘柄集中は細くひょろり、分散はどっしり太い幹</li>
           <li>🍃 <b>年代別リバランス</b> … 年齢に対し株が過剰だと暴風。債券の幹が育つと二股で踏ん張れる</li>
         </ul>
-      </div>
+      </details>
     </div>
   </div>
 
