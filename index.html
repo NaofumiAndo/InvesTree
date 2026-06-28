@@ -324,6 +324,50 @@
     margin-left: 8px;
     vertical-align: middle;
   }
+  /* 目先の備え：考え方ガイドのリンク＆モーダル */
+  .help-link {
+    display: inline-block; background: none; border: none; padding: 4px 0 2px;
+    margin-top: 2px; font: inherit; font-size: 11.5px; color: var(--ink-soft);
+    opacity: 0.85; text-decoration: underline; cursor: pointer;
+  }
+  .help-link:hover { color: var(--accent-dk); opacity: 1; }
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 50; padding: 16px;
+    background: rgba(60, 50, 35, 0.45);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal-overlay[hidden] { display: none; }
+  .modal {
+    background: #fffdf8; border-radius: 18px; position: relative;
+    width: 100%; max-width: 430px; max-height: 88vh; overflow-y: auto;
+    padding: 20px 20px 16px; box-shadow: 0 14px 44px rgba(0, 0, 0, 0.28);
+  }
+  .modal h3 { margin: 0 0 4px; font-size: 16px; color: var(--ink); }
+  .modal h4 { margin: 16px 0 4px; font-size: 13.5px; color: var(--accent-dk); }
+  .modal > p { margin: 0 0 4px; font-size: 12px; color: var(--ink-soft); line-height: 1.55; }
+  .modal section p { margin: 0 0 7px; font-size: 12px; color: var(--ink-soft); line-height: 1.55; }
+  .modal .muted { opacity: 0.85; }
+  .modal label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 4px 0; color: var(--ink); }
+  .modal input[type="number"] {
+    width: 96px; padding: 6px 8px; border: 1.5px solid #ead9bd; border-radius: 9px;
+    font: inherit; font-size: 13px; text-align: right; background: #fff;
+  }
+  .modal input:focus { outline: none; border-color: var(--accent); }
+  .modal-x {
+    position: absolute; top: 8px; right: 12px; background: none; border: none;
+    font-size: 24px; line-height: 1; color: var(--ink-soft); cursor: pointer;
+  }
+  .exp-row { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 5px 0 0; cursor: pointer; }
+  .exp-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
+  .exp-amt-wrap { margin: 3px 0 4px 26px; font-size: 12.5px; color: var(--ink-soft); }
+  .exp-amt-wrap[hidden] { display: none; }
+  .exp-total { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--ink); text-align: right; }
+  .modal-foot { margin-top: 18px; text-align: center; }
+  .reflect-btn {
+    background: var(--accent); color: #fff; border: none; border-radius: 12px;
+    padding: 11px 26px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  }
+  .reflect-btn:hover { filter: brightness(1.05); }
 </style>
 </head>
 <body>
@@ -348,11 +392,12 @@
         <summary>① <svg class="root-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><g fill="none" stroke="#a17a49" stroke-width="1.7" stroke-linecap="round"><path d="M12 2L12 12"/><path d="M12 8C9 10 7.5 13 7 18"/><path d="M12 8C15 10 16.5 13 17 18"/><path d="M12 12C10.5 15 10 17 9.5 21"/><path d="M12 12C13.5 15 14 17 14.5 21"/></g></svg> 目先の備え <span id="needsChip" class="sum-chip"></span></summary>
         <p class="needs-lead">まず生活防衛資金と目先の出費を現金で確保。満たせているか、残りは投資にまわせる余力かを見ます。</p>
         <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
-        <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
+        <input type="range" id="iMonthly" min="5" max="100" step="1" value="25">
         <label>生活防衛資金として確保する月数 <span class="v" id="vMonths"></span></label>
         <input type="range" id="iMonths" min="1" max="12" step="1" value="3">
         <label>3年以内に使う予定の大きな出費 <span class="v" id="vNear"></span></label>
-        <input type="range" id="iNear" min="0" max="500" step="10" value="50">
+        <input type="range" id="iNear" min="0" max="2000" step="10" value="50">
+        <button type="button" class="help-link" id="needsHelpOpen">考え方が分からない方・詳細はこちら ›</button>
         <div id="needsResult" class="needs-result"></div>
       </details>
 
@@ -422,6 +467,38 @@
       <input type="range" id="sCash" min="0" max="100" step="1">
       <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
     </details>
+  </div>
+</div>
+
+<!-- 目先の備え：考え方ガイド（入力して①に反映） -->
+<div class="modal-overlay" id="needsHelp" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="目先の備えの考え方">
+    <button type="button" class="modal-x" id="needsHelpClose" aria-label="閉じる">×</button>
+    <h3>目先の備えの考え方</h3>
+    <p>3つを順に決めると、いくら現金で確保すべきかが分かります。</p>
+
+    <section>
+      <h4>① 毎月の生活費</h4>
+      <p>家賃・食費・光熱費など、毎月かならず出ていくお金。<span class="muted">総合資産管理アプリ（マネーフォワード等）で確認してみよう。いずれは口座連携で自動取得できるようにします。</span></p>
+      <label>毎月の生活費 <input type="number" id="hMonthly" min="0" step="1"> 万円</label>
+    </section>
+
+    <section>
+      <h4>② 生活防衛資金</h4>
+      <p>急に失業する・働けなくなる等の危機に対応するため、最低限ここまでは現金で確保したい期間。一般に生活費の3〜6か月分が目安です。</p>
+      <label>確保する月数 <input type="number" id="hMonths" min="1" max="24" step="1"> か月</label>
+    </section>
+
+    <section>
+      <h4>③ 目先3年の大型出費</h4>
+      <p>3年以内に使う予定の大きな出費にチェックし、必要額を入力してください。</p>
+      <div id="hExpenses"></div>
+      <div class="exp-total">合計 <span id="hExpTotal">0</span> 万円</div>
+    </section>
+
+    <div class="modal-foot">
+      <button type="button" class="reflect-btn" id="needsHelpApply">この内容で反映</button>
+    </div>
   </div>
 </div>
 
@@ -1483,6 +1560,58 @@ function renderMethod() {
 ["iMonthly","iMonths","iNear"].forEach(id => {
   $(id).addEventListener("input", renderAll);
 });
+
+// ===== 目先の備え：考え方ガイド（モーダル）→ 入力して①スライダーに反映 =====
+const EXPENSE_ITEMS = ["自動車（購入・買い替え）", "住宅ローンの頭金", "入学金・教育費", "高額医療費", "リフォーム・家具家電", "その他"];
+function buildExpenseList() {
+  const host = $("hExpenses");
+  host.innerHTML = EXPENSE_ITEMS.map((nm, i) =>
+    `<label class="exp-row"><input type="checkbox" class="exp-chk" data-i="${i}">${nm}</label>` +
+    `<div class="exp-amt-wrap" data-i="${i}" hidden><input type="number" class="exp-amt" data-i="${i}" min="0" step="1"> 万円</div>`
+  ).join("");
+  host.querySelectorAll(".exp-chk").forEach(chk => chk.addEventListener("change", () => {
+    const wrap = host.querySelector(`.exp-amt-wrap[data-i="${chk.dataset.i}"]`);
+    wrap.hidden = !chk.checked;
+    const inp = wrap.querySelector(".exp-amt");
+    if (chk.checked) inp.focus(); else inp.value = "";
+    updateExpTotal();
+  }));
+  host.querySelectorAll(".exp-amt").forEach(inp => inp.addEventListener("input", updateExpTotal));
+}
+function expenseTotal() {
+  let sum = 0;
+  $("hExpenses").querySelectorAll(".exp-chk").forEach(chk => {
+    if (chk.checked) sum += +$("hExpenses").querySelector(`.exp-amt[data-i="${chk.dataset.i}"]`).value || 0;
+  });
+  return sum;
+}
+function updateExpTotal() { $("hExpTotal").textContent = expenseTotal().toLocaleString(); }
+function openNeedsHelp() {
+  $("hMonthly").value = $("iMonthly").value;   // 生活費・月数は現在値をプリフィル
+  $("hMonths").value = $("iMonths").value;
+  buildExpenseList();                          // 大型出費はチェックリストで毎回入力
+  updateExpTotal();
+  $("needsHelp").hidden = false;
+}
+function closeNeedsHelp() { $("needsHelp").hidden = true; }
+function applyNeedsHelp() {
+  const setSlider = (id, val) => {
+    const el = $(id);
+    el.value = clamp(val, +el.min, +el.max);
+    el.dispatchEvent(new Event("input", { bubbles: true }));   // ラベル更新＋renderAll
+  };
+  const monthly = +$("hMonthly").value || 0;
+  const months = +$("hMonths").value || 0;
+  if (monthly > 0) setSlider("iMonthly", monthly);
+  if (months > 0) setSlider("iMonths", months);
+  setSlider("iNear", expenseTotal());
+  closeNeedsHelp();
+}
+$("needsHelpOpen").addEventListener("click", openNeedsHelp);
+$("needsHelpClose").addEventListener("click", closeNeedsHelp);
+$("needsHelpApply").addEventListener("click", applyNeedsHelp);
+$("needsHelp").addEventListener("click", (e) => { if (e.target === $("needsHelp")) closeNeedsHelp(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("needsHelp").hidden) closeNeedsHelp(); });
 // 急な出費への対応：そのまま / 売る / 担保ローン
 document.querySelectorAll(".method-btn").forEach(btn => {
   btn.addEventListener("click", () => {
