@@ -111,11 +111,10 @@
     position: relative;
   }
   .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
-  .sum-chip { margin-left: auto; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 9px; white-space: nowrap; }
+  .sum-chip { margin-left: auto; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 9px; white-space: nowrap; min-width: 96px; text-align: center; box-sizing: border-box; }
   .sum-chip.ok    { background: #e7f3e2; color: #4f8a52; }
   .sum-chip.warn  { background: #fdeccd; color: #c2872f; }
   .sum-chip.bad   { background: #f7ddcb; color: #c2703a; }
-  details.box > summary { flex-wrap: wrap; }
   .sell-toggle { display: flex !important; align-items: center; gap: 8px; justify-content: flex-start !important; font-size: 13px; color: var(--ink); margin: 4px 0 2px; cursor: pointer; }
   .sell-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
   .method-row { display: flex; gap: 8px; margin: 10px 0 4px; }
@@ -238,7 +237,7 @@
   details.box > summary::-webkit-details-marker { display: none; }
   details.box > summary::after {
     content: "▾";
-    margin-left: auto;
+    margin-left: 8px;
     font-size: 11px;
     color: var(--ink-soft);
     transition: transform .15s ease;
@@ -340,7 +339,7 @@
       </details>
 
       <details class="box needs">
-        <summary>② 🌳 保有商品（中長期の投資） <span id="holdChip" class="sum-chip"></span> <span id="customTag"></span></summary>
+        <summary>② 🌳 保有商品 <span id="holdChip" class="sum-chip"></span></summary>
         <label>退職を想定する年齢 <span class="v" id="vRetire"></span></label>
         <input type="range" id="iRetire" min="50" max="80" step="1" value="65">
         <div id="holdHealth" class="needs-result"></div>
@@ -1087,7 +1086,6 @@ function renderBalance(t) {
     $("who").textContent = `${projInfo.years}年後の予測（${projInfo.age}歳）`;
     $("amt").textContent = "¥" + Math.round(projInfo.total).toLocaleString();
     $("delta").textContent = `これからの積立で育った姿`;
-    $("customTag").innerHTML = `<span class="tag-custom">投影中</span>`;
     return;
   }
   const total = state.equity + state.bond + state.other;
@@ -1096,7 +1094,6 @@ function renderBalance(t) {
   // 擬似的な前日比（葉の色イメージ）
   const delta = (total * 0.0042);
   $("delta").textContent = `前日比 +¥${Math.round(delta).toLocaleString()} (+0.42%)`;
-  $("customTag").innerHTML = custom ? `<span class="tag-custom">カスタム編集中</span>` : "";
 }
 
 function attachTreeInteractions(t) {
@@ -1151,8 +1148,9 @@ function renderNeeds(nd) {
 
   // 折りたたみ時もパッと見えるサマリーチップ
   const chip = $("needsChip");
-  if (cov >= 1) { chip.className = "sum-chip ok"; chip.textContent = `✓ 余力 ${manen(Math.max(0, over))}`; }
-  else { chip.className = "sum-chip bad"; chip.textContent = `${manen(nd.necessary - cash)} 不足`; }
+  const man0 = v => Math.round(v / 10000).toLocaleString() + "万";
+  if (cov >= 1) { chip.className = "sum-chip ok"; chip.textContent = `余力 ${man0(Math.max(0, over))}`; }
+  else { chip.className = "sum-chip bad"; chip.textContent = `不足 ${man0(nd.necessary - cash)}`; }
 
   const verdict = cov >= 1
     ? `<div class="needs-verdict ok">✅ 土台クリア｜投資にまわせる余力 ${manen(Math.max(0, over))}</div>
