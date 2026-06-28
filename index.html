@@ -643,39 +643,48 @@ function buildTree(t) {
   const spreadAng  = 0.42;     // 兄弟枝の開き角
   const windPerLv  = -wind * 0.16;  // 1段ごとに風で少しずつ傾く（上ほど大きくしなる）
 
-  // 再帰的な枝分かれ（L-system 的）。一度二股なら先もずっと二股に分かれる。
-  // bucket.br に枝、bucket.lf に葉を貯める（株・債券・幹を別グループにして色分け＆内訳表示）
-  function grow(x, y, ang, len, w, depth, tint, bucket, leafScale) {
-    const ls = leafScale != null ? leafScale : 1;   // 保有比率で葉の量感を変える
+  // 再帰的な枝分かれ。枝は bucket.br に、枝先は bucket.tips に集める（葉は後で一括）。
+  function grow(x, y, ang, len, w, depth, bucket) {
     const ex = x + Math.cos(ang) * len;
     const ey = y - Math.sin(ang) * len;
     const tipW = Math.max(1.2, w * widthDecay);
     bucket.br += `<path d="${branchPath(x, y, w, ex, ey, tipW)}"/>`;
-    if (depth <= 0) {
-      tips.push({ x: ex, y: ey });
-      const r = (12 + w * 1.6 + lush * 6) * ls;
-      bucket.lf += leafCluster(ex, ey - r * 0.12, r, tint.main);
-      bucket.lf += leafCluster(ex - r * 0.42, ey + r * 0.22, r * 0.6, tint.dk);
-      return;
-    }
+    if (depth <= 0) { bucket.tips.push({ x: ex, y: ey }); return; }
     for (let i = 0; i < 2; i++) {                 // 二股
       const dir = i === 0 ? -1 : 1;
       let a = ang + dir * spreadAng * (0.75 + rng() * 0.5) + windPerLv + (rng() - 0.5) * 0.14;
       const l = len * lenDecay * (0.92 + rng() * 0.16);
-      grow(ex, ey, a, l, w * widthDecay, depth - 1, tint, bucket, ls);
+      grow(ex, ey, a, l, w * widthDecay, depth - 1, bucket);
     }
     // 太めの枝には中ほどから小枝を1本足してボリュームを出す
     if (w > 7 && depth >= 2 && rng() < 0.55) {
       const a = ang + (rng() - 0.5) * 0.5 + windPerLv;
-      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, tint, bucket, ls);
+      grow(ex, ey, a, len * 0.55, tipW * 0.85, depth - 2, bucket);
     }
+  }
+
+  // 葉を一括描画：1葉の大きさを枝先数で補正し、総面積を投資額に比例させる。
+  // r ∝ √(金額/枝先数) なので Σr² ∝ 金額 → 株も債券も「葉の総面積 ∝ 投資額」。
+  const LEAF_K = 0.052;
+  function emitLeaves(bucket) {
+    const n = bucket.tips.length;
+    if (!n || !(bucket.amount > 0)) return;
+    let s = "";
+    for (const tp of bucket.tips) {
+      const r = clamp(LEAF_K * Math.sqrt(bucket.amount / n) * (0.85 + rng() * 0.3), 7, 42);
+      s += leafCluster(tp.x, tp.y - r * 0.12, r, bucket.tint.main);
+      s += leafCluster(tp.x - r * 0.42, tp.y + r * 0.22, r * 0.6, bucket.tint.dk);
+    }
+    bucket.lf = s;
   }
 
   const depth = clamp(Math.round(2 + t.H / 90), 2, 5);   // 樹齢が高いほど枝分かれが多い
   const trunkAng = Math.PI / 2 - wind * 0.10;            // 根元のわずかな傾き
   const tintEq = { main: greenMain, dk: greenDk };
   const tintBd = { main: "#56a59d", dk: "#447d76" };   // 債券＝奥に引っ込む落ち着いた青緑
-  const baseBucket = { br: "", lf: "" }, eqBucket = { br: "", lf: "" }, bdBucket = { br: "", lf: "" };
+  const baseBucket = { br: "" };
+  const eqBucket = { br: "", lf: "", tips: [], tint: tintEq, amount: t.equity };
+  const bdBucket = { br: "", lf: "", tips: [], tint: tintBd, amount: t.bond };
   let newTrunkVisW = 0;   // 新しい幹の根元の見かけ幅（切り株との比較用）
 
   const gs = t.girthScale != null ? t.girthScale : 1;   // 売却後の再成長で幹を細く（追いつくと1.0）
@@ -685,7 +694,6 @@ function buildTree(t) {
   const SB = t.equity + t.bond;
   const eqShare = SB > 0 ? t.equity / SB : 1, bdShare = 1 - eqShare;
   t.hasBond = t.bond > 1 && bdShare > 0.001;
-  const leafF = sh => 0.55 + 0.95 * sh;          // 比率で葉の量感
   const W = Math.max(3, t.equityGirth * gs);     // 幹＝株の分散度
   newTrunkVisW = W * 1.5;
   const Lf = t.H * 0.34;                          // 樹冠の下までの幹（債券枝はこの下に付く）
@@ -699,21 +707,20 @@ function buildTree(t) {
   // 先に（奥に）描く。緑の樹冠の下で左右に張り出して、高い木を支える。
   if (t.hasBond) {
     const bw = Math.max(3, t.bondGirth * gs);
-    const bondLeaf = leafF(bdShare) * 0.9;
-    const reach = t.H * 0.22 * (0.55 + 1.0 * bdShare);   // 債券が多いほど横へ広がる
+    // 支え枝はコンパクトに（短め）。葉の総面積は emitLeaves が投資額に合わせる。
+    const reach = t.H * 0.15 * (0.7 + 0.5 * bdShare);
     const bdDepth = Math.max(2, depth - 1);
-    const by1 = baseY - t.H * 0.22, bx1 = trunkXat(by1);   // 下段の支え枝
-    grow(bx1, by1, trunkAng + 0.95, reach, bw, bdDepth, tintBd, bdBucket, bondLeaf);  // 左へ
-    grow(bx1, by1, trunkAng - 0.95, reach, bw, bdDepth, tintBd, bdBucket, bondLeaf);  // 右へ
-    if (bdShare > 0.33) {                                  // 債券が多いと上段にもう一対
-      const by2 = baseY - t.H * 0.31, bx2 = trunkXat(by2);
-      grow(bx2, by2, trunkAng + 0.78, reach * 0.82, bw * 0.9, bdDepth, tintBd, bdBucket, bondLeaf * 0.92);
-      grow(bx2, by2, trunkAng - 0.78, reach * 0.82, bw * 0.9, bdDepth, tintBd, bdBucket, bondLeaf * 0.92);
-    }
+    const by1 = baseY - t.H * 0.26, bx1 = trunkXat(by1);   // 樹冠の下から左右へ
+    grow(bx1, by1, trunkAng + 0.82, reach, bw, bdDepth, bdBucket);  // 左へ
+    grow(bx1, by1, trunkAng - 0.82, reach, bw, bdDepth, bdBucket);  // 右へ
   }
 
-  // ===== 株の樹冠（上向き・緑）。比率で量感、株中心ほど大きく豊かに。=====
-  grow(fx, fy, trunkAng, t.H * 0.20, W, depth, tintEq, eqBucket, leafF(eqShare));
+  // ===== 株の樹冠（上向き・緑）。=====
+  grow(fx, fy, trunkAng, t.H * 0.20, W, depth, eqBucket);
+
+  // 葉を一括描画：株も債券も「葉の総面積 ∝ 投資額」になるようサイズ補正。
+  emitLeaves(eqBucket);
+  emitLeaves(bdBucket);
 
   const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
 
@@ -758,9 +765,10 @@ function buildTree(t) {
   // 実り＝資産から得られる「年間に使えるお金」（4%目安）。資産が大きいほど鈴なり。
   let fruitsSVG = "";
   const totalAssets = t.equity + t.bond + t.other;
-  if (totalAssets > 0 && tips.length && !sell) {
+  const allTips = eqBucket.tips.concat(bdBucket.tips);
+  if (totalAssets > 0 && allTips.length && !sell) {
     const nFruit = clamp(Math.round(Math.log10(Math.max(1, totalAssets / 100000)) * 3), 0, 14);
-    const shuffled = tips.slice().sort(() => rng() - 0.5);
+    const shuffled = allTips.slice().sort(() => rng() - 0.5);
     let fr = "";
     for (let i = 0; i < nFruit && i < shuffled.length; i++) {
       const tp = shuffled[i];
