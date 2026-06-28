@@ -393,6 +393,10 @@
       <input type="range" id="sEq" min="0" max="100" step="1">
       <label>債券の量 <span class="v" id="vBond"></span></label>
       <input type="range" id="sBond" min="0" max="100" step="1">
+      <label>債券のリスク階級（国債=小 … 新興国債/社債=大） <span class="v" id="vBondRisk"></span></label>
+      <input type="range" id="sBondRisk" min="0" max="1" step="0.04">
+      <label>債券の分散度（実質発行体数） <span class="v" id="vBondDiv"></span></label>
+      <input type="range" id="sBondDiv" min="0" max="3.5" step="0.05">
       <label>その他資産の量（REIT・金・暗号資産等） <span class="v" id="vOther"></span></label>
       <input type="range" id="sOther" min="0" max="100" step="1">
       <label>現金・MRF等の量（土台） <span class="v" id="vCash"></span></label>
@@ -447,7 +451,7 @@ const PROFILES = [
     holdings: [
       { name: "全世界株式インデックス", assetClass: "equity", amount: 3200000, distinctSecurities: 3000 },
       { name: "個別株（1銘柄）", assetClass: "equity", amount: 800000, distinctSecurities: 1 },
-      { name: "先進国債券インデックス", assetClass: "bond", amount: 1500000, distinctSecurities: 800 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 1500000, distinctSecurities: 800, riskTier: "low" },
       { name: "J-REIT", assetClass: "other", amount: 300000, distinctSecurities: 50 },
     ],
     cash: 600000,
@@ -463,8 +467,8 @@ const PROFILES = [
     holdings: [
       { name: "全世界株式インデックス", assetClass: "equity", amount: 4800000, distinctSecurities: 3000 },
       { name: "国内株式インデックス", assetClass: "equity", amount: 1200000, distinctSecurities: 400 },
-      { name: "先進国債券インデックス", assetClass: "bond", amount: 4000000, distinctSecurities: 1000 },
-      { name: "国内債券インデックス", assetClass: "bond", amount: 2000000, distinctSecurities: 300 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 4000000, distinctSecurities: 1000, riskTier: "low" },
+      { name: "国内債券インデックス", assetClass: "bond", amount: 2000000, distinctSecurities: 300, riskTier: "low" },
       { name: "純金上場信託", assetClass: "other", amount: 500000, distinctSecurities: 1 },
     ],
     cash: 3000000,
@@ -501,21 +505,35 @@ function yearsFrom(dateStr) {
   return (TODAY - new Date(dateStr)) / (365.25 * 24 * 3600 * 1000);
 }
 
+// 債券のリスク階級 → 係数（小=ほぼ安全 … 大=株1銘柄級の信用リスク）
+const BOND_RISK_COEF = { low: 0.12, mid: 0.5, high: 1.0 };
+
 /** 保有商品 → スライダーが操作する生の状態へ */
 function profileToState(p) {
   let eq = 0, bd = 0, ot = 0;
   // 株式内の分散スコア：金額加重の log10(実質銘柄数)。1銘柄=0、3000銘柄≈3.48
   let eqWeighted = 0;
+  // 債券も同じくルックスルーで分散を測り（投信は中身の本数）、リスクは金額加重平均
+  let bdWeighted = 0, bdRiskWeighted = 0;
   for (const h of p.holdings) {
     if (h.assetClass === "equity") { eq += h.amount; eqWeighted += h.amount * Math.log10(Math.max(1, h.distinctSecurities)); }
-    else if (h.assetClass === "bond") bd += h.amount;
+    else if (h.assetClass === "bond") {
+      bd += h.amount;
+      bdWeighted += h.amount * Math.log10(Math.max(1, h.distinctSecurities || 1));
+      bdRiskWeighted += h.amount * (BOND_RISK_COEF[h.riskTier] ?? 0.5);
+    }
     else ot += h.amount;
   }
   const divScore = eq > 0 ? eqWeighted / eq : 0;
+  // 複数商品でも、商品をまたいで「透かして」発行体数を合算 → 分散はここで上がる
+  const bondDivScore = bd > 0 ? bdWeighted / bd : 0;
+  const bondRisk = bd > 0 ? bdRiskWeighted / bd : 0.5;
   return {
     age: p.age,
     years: Math.max(0, yearsFrom(p.start)),
     divScore: divScore,
+    bondDivScore: bondDivScore,
+    bondRisk: bondRisk,
     equity: eq,
     bond: bd,
     other: ot,
@@ -537,9 +555,16 @@ function deriveTree(s) {
   const divFactor = 0.38 + 0.62 * (clamp(s.divScore, 0, 3.5) / 3.5);
   const equityGirth = clamp(0.016 * Math.sqrt(Math.max(0, s.equity)) * divFactor, 4, 60);
 
-  // 債券の幹：量に応じて木質化（分散資産なので素直に太い）
+  // 債券の安全度＝1 −（リスク × 集中度）。「リスク小」か「分散済み」のどちらかで安全。
+  //  ・集中度：ルックスルー実質発行体数が多いほど低い（投信や複数商品で下がる）
+  //  ・リスク：国債=小 … 新興国債/社債=大（s.bondRisk は金額加重平均）
+  const bondConcentration = clamp(1 - (s.bondDivScore || 0) / 3.0, 0, 1);
+  const bondDanger = clamp((s.bondRisk ?? 0.5) * bondConcentration, 0, 1);
+  const bondQuality = 1 - bondDanger;                // 0=頼りない … 1=頼もしい
+  // 債券の幹：量(√)に、安全度を木質化係数として掛ける（危ういほど細い支え枝）
+  const bondQualFactor = 0.38 + 0.62 * bondQuality;
   const bondShareSB = sb > 0 ? s.bond / sb : 0;
-  const bondGirth = clamp(0.016 * Math.sqrt(Math.max(0, s.bond)) * 0.9, 4, 60);
+  const bondGirth = clamp(0.016 * Math.sqrt(Math.max(0, s.bond)) * bondQualFactor, 4, 60);
   const forkRatio = bondShareSB; // 0=1本幹, 0.5=対称
 
   // 風＝年齢相応リスクとのズレ（§3-3）。退職想定年までの距離でおすすめ株比率が決まる。
@@ -556,7 +581,7 @@ function deriveTree(s) {
   const rootDepth = (total + s.cash) > 0 ? s.cash / (total + s.cash) : 0;
 
   return {
-    H, heightFactor, equityGirth, bondGirth, forkRatio,
+    H, heightFactor, equityGirth, bondGirth, forkRatio, bondQuality,
     wind, gap, target, equityPctSB, otherShare, rootDepth,
     total, equity: s.equity, bond: s.bond, other: s.other,
   };
@@ -695,12 +720,15 @@ function buildTree(t) {
   // 先に（奥に）描く。緑の樹冠の下で左右に張り出して、高い木を支える。
   if (t.hasBond) {
     const bw = Math.max(3, t.bondGirth * gs);
+    // 債券の質が低い（危うい）ほど、支え枝は短く・下に垂れて「頼りなくしなる」。
+    const bq = t.bondQuality ?? 1;
+    const sag = (1 - bq) * 0.38;
     // 支え枝はコンパクトに（短め）。葉の総面積は emitLeaves が投資額に合わせる。
-    const reach = t.H * 0.15 * (0.7 + 0.5 * bdShare);
+    const reach = t.H * 0.15 * (0.7 + 0.5 * bdShare) * (0.72 + 0.28 * bq);
     const bdDepth = Math.max(2, depth - 1);
     const by1 = baseY - t.H * 0.31, bx1 = trunkXat(by1);   // 樹冠寄り（少し上）から左右へ
-    grow(bx1, by1, trunkAng + 0.82, reach, bw, bdDepth, bdBucket);  // 左へ
-    grow(bx1, by1, trunkAng - 0.82, reach, bw, bdDepth, bdBucket);  // 右へ
+    grow(bx1, by1, trunkAng + 0.82 + sag, reach, bw, bdDepth, bdBucket);  // 左へ
+    grow(bx1, by1, trunkAng - 0.82 - sag, reach, bw, bdDepth, bdBucket);  // 右へ
   }
 
   // ===== 株の樹冠（上向き・緑）。=====
@@ -1043,6 +1071,8 @@ function syncSliders() {
   // 量は万円スケールに丸めてスライダーに反映（0-100目盛り）
   $("sEq").value = Math.round(state.equity / 100000);
   $("sBond").value = Math.round(state.bond / 100000);
+  $("sBondRisk").value = (state.bondRisk ?? 0.5).toFixed(2);
+  $("sBondDiv").value = (state.bondDivScore ?? 0).toFixed(2);
   $("sOther").value = Math.round(state.other / 100000);
   $("sCash").value = Math.round(state.cash / 100000);
 }
@@ -1052,6 +1082,8 @@ function readSliders() {
     age: +$("sAge").value,
     years: +$("sYears").value,
     divScore: +$("sDiv").value,
+    bondRisk: +$("sBondRisk").value,
+    bondDivScore: +$("sBondDiv").value,
     equity: +$("sEq").value * 100000,
     bond: +$("sBond").value * 100000,
     other: +$("sOther").value * 100000,
@@ -1213,6 +1245,8 @@ function renderAll() {
   $("vDiv").textContent = state.divScore < 0.4 ? "1銘柄級" : state.divScore < 2 ? "数〜数十" : "数千（分散）";
   $("vEq").textContent = (state.equity/10000).toLocaleString() + "万";
   $("vBond").textContent = (state.bond/10000).toLocaleString() + "万";
+  { const r = state.bondRisk ?? 0.5; $("vBondRisk").textContent = r < 0.3 ? "小（国債級）" : r < 0.7 ? "中" : "大（社債/新興国）"; }
+  $("vBondDiv").textContent = (state.bondDivScore ?? 0) < 0.4 ? "1本級" : (state.bondDivScore ?? 0) < 2 ? "数〜数十" : "投信級（分散）";
   $("vOther").textContent = (state.other/10000).toLocaleString() + "万";
   $("vCash").textContent = (state.cash/10000).toLocaleString() + "万";
   $("vRestart").textContent = restartYears.toFixed(1) + "年";
@@ -1340,7 +1374,7 @@ function renderMethod() {
 }
 
 // スライダー配線
-["sAge","sYears","sDiv","sEq","sBond","sOther","sCash"].forEach(id => {
+["sAge","sYears","sDiv","sEq","sBond","sBondRisk","sBondDiv","sOther","sCash"].forEach(id => {
   $(id).addEventListener("input", readSliders);
 });
 // 現金の土台（必要現金）の入力 → 再描画のみ（保有データは変えない）
