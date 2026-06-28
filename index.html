@@ -361,6 +361,7 @@
   .exp-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); }
   .exp-amt-wrap { margin: 3px 0 4px 26px; font-size: 12.5px; color: var(--ink-soft); }
   .exp-amt-wrap[hidden] { display: none; }
+  .exp-hint { margin-left: 8px; font-size: 10.5px; color: var(--ink-soft); opacity: 0.7; }
   .exp-total { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--ink); text-align: right; }
   .modal-foot { margin-top: 18px; text-align: center; }
   .reflect-btn {
@@ -1562,12 +1563,20 @@ function renderMethod() {
 });
 
 // ===== 目先の備え：考え方ガイド（モーダル）→ 入力して①スライダーに反映 =====
-const EXPENSE_ITEMS = ["自動車（購入・買い替え）", "住宅ローンの頭金", "入学金・教育費", "高額医療費", "リフォーム・家具家電", "その他"];
+const EXPENSE_ITEMS = [
+  { name: "自動車（購入・買い替え）" },
+  { name: "住宅ローンの頭金", hint: "物件価格の1〜2割（10〜20%）が目安" },
+  { name: "入学金・教育費" },
+  { name: "高額医療費" },
+  { name: "リフォーム・家具家電" },
+  { name: "その他" },
+];
 function buildExpenseList() {
   const host = $("hExpenses");
-  host.innerHTML = EXPENSE_ITEMS.map((nm, i) =>
-    `<label class="exp-row"><input type="checkbox" class="exp-chk" data-i="${i}">${nm}</label>` +
-    `<div class="exp-amt-wrap" data-i="${i}" hidden><input type="number" class="exp-amt" data-i="${i}" min="0" step="1"> 万円</div>`
+  host.innerHTML = EXPENSE_ITEMS.map((it, i) =>
+    `<label class="exp-row"><input type="checkbox" class="exp-chk" data-i="${i}">${it.name}</label>` +
+    `<div class="exp-amt-wrap" data-i="${i}" hidden><input type="number" class="exp-amt" data-i="${i}" min="0" step="1"> 万円` +
+    `${it.hint ? `<span class="exp-hint">${it.hint}</span>` : ""}</div>`
   ).join("");
   host.querySelectorAll(".exp-chk").forEach(chk => chk.addEventListener("change", () => {
     const wrap = host.querySelector(`.exp-amt-wrap[data-i="${chk.dataset.i}"]`);
