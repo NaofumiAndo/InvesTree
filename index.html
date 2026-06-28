@@ -680,39 +680,40 @@ function buildTree(t) {
 
   const gs = t.girthScale != null ? t.girthScale : 1;   // 売却後の再成長で幹を細く（追いつくと1.0）
 
-  if (t.forkRatio <= 0.02) {
-    /* ----- 1本幹（株式100%）----- */
-    t.isFork = false;
-    const W = Math.max(3, t.equityGirth * gs);
-    newTrunkVisW = W * 1.5;
-    const Lf = t.H * 0.30;                                // しっかりした1本の幹
-    const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
-    baseBucket.br += `<path d="${branchPath(CX, baseY, W * 1.5, fx, fy, W)}"/>`;  // 末広がりの根元
-    grow(fx, fy, trunkAng, t.H * 0.22, W, depth, tintEq, eqBucket);
-  } else {
-    /* ----- 二股（株 + 債券）：1本の幹から株(左)・債券(右)の2本に分かれる ----- */
-    t.isFork = true;
-    const ew = Math.max(3, t.equityGirth * gs);   // 株の主枝＝分散度で太さが決まる
-    const bw = Math.max(3, t.bondGirth * gs);     // 債券の主枝＝量で太さが決まる
-    // ★段差ゼロの構造：幹の上端の太さ＝「太い方の主枝の幅」。主枝はその上端と
-    //   同じ点・同じ幅から生えるので、樹高（H）が変わっても常にぴったり一致する。
-    const stemTop = Math.max(ew, bw);
-    newTrunkVisW = stemTop * 1.4;
-    const Lf = t.H * 0.34;
-    const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
-    t.forkY = fy;
-    // 幹：根元フレア → 上端 stemTop（太い方の主枝と一致）
-    baseBucket.br += `<path d="${branchPath(CX, baseY, stemTop * 1.4, fx, fy, stemTop)}"/>`;
-    // 保有比率（金額）で枝葉の量感をスケール。50:50で同じ大きさ。
-    const SB = t.equity + t.bond;
-    const eqShare = SB > 0 ? t.equity / SB : 0.5, bdShare = 1 - eqShare;
-    const baseLen = t.H * 0.26;
-    const lenF = sh => 0.7 + 0.6 * sh;   // 0.5→1.0
-    const leafF = sh => 0.55 + 0.9 * sh; // 0.5→1.0
-    // 主枝は幹の上端(fx,fy)と同じ点から。株は手前・債券は奥（重なりで奥行き）。
-    grow(fx, fy, trunkAng - 0.16, baseLen * lenF(bdShare), bw, depth, tintBd, bdBucket, leafF(bdShare));  // 債券（奥）
-    grow(fx, fy, trunkAng + 0.17, baseLen * lenF(eqShare), ew, depth, tintEq, eqBucket, leafF(eqShare));  // 株（手前）
+  // ===== 株＝木の本体（幹＋上の樹冠）。常に左右対称の1本の木。=====
+  // ＝若く株中心でも「ふつうの木」で偏って見えない。
+  const SB = t.equity + t.bond;
+  const eqShare = SB > 0 ? t.equity / SB : 1, bdShare = 1 - eqShare;
+  t.hasBond = t.bond > 1 && bdShare > 0.001;
+  const leafF = sh => 0.55 + 0.95 * sh;          // 比率で葉の量感
+  const W = Math.max(3, t.equityGirth * gs);     // 幹＝株の分散度
+  newTrunkVisW = W * 1.5;
+  const Lf = t.H * 0.34;                          // 樹冠の下までの幹（債券枝はこの下に付く）
+  const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
+  t.forkY = fy;
+  // 幹の途中の x（高さ h での位置）。債券枝の付け根を幹に合わせる。
+  const trunkXat = yy => CX + (fx - CX) * clamp((baseY - yy) / (baseY - fy), 0, 1);
+  baseBucket.br += `<path d="${branchPath(CX, baseY, W * 1.5, fx, fy, W)}"/>`;  // 根元フレア→幹
+
+  // ===== 債券＝低い位置から左右に広がる「支え枝」。木が高くなるほど効く。=====
+  // 先に（奥に）描く。緑の樹冠の下で左右に張り出して、高い木を支える。
+  if (t.hasBond) {
+    const bw = Math.max(3, t.bondGirth * gs);
+    const bondLeaf = leafF(bdShare) * 0.9;
+    const reach = t.H * 0.22 * (0.55 + 1.0 * bdShare);   // 債券が多いほど横へ広がる
+    const bdDepth = Math.max(2, depth - 1);
+    const by1 = baseY - t.H * 0.22, bx1 = trunkXat(by1);   // 下段の支え枝
+    grow(bx1, by1, trunkAng + 0.95, reach, bw, bdDepth, tintBd, bdBucket, bondLeaf);  // 左へ
+    grow(bx1, by1, trunkAng - 0.95, reach, bw, bdDepth, tintBd, bdBucket, bondLeaf);  // 右へ
+    if (bdShare > 0.33) {                                  // 債券が多いと上段にもう一対
+      const by2 = baseY - t.H * 0.31, bx2 = trunkXat(by2);
+      grow(bx2, by2, trunkAng + 0.78, reach * 0.82, bw * 0.9, bdDepth, tintBd, bdBucket, bondLeaf * 0.92);
+      grow(bx2, by2, trunkAng - 0.78, reach * 0.82, bw * 0.9, bdDepth, tintBd, bdBucket, bondLeaf * 0.92);
+    }
   }
+
+  // ===== 株の樹冠（上向き・緑）。比率で量感、株中心ほど大きく豊かに。=====
+  grow(fx, fy, trunkAng, t.H * 0.20, W, depth, tintEq, eqBucket, leafF(eqShare));
 
   const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
 
@@ -819,12 +820,11 @@ function buildTree(t) {
   const tSty = `text-anchor="middle" font-weight="700" pointer-events="none" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.2" stroke-linejoin="round" style="font-family:inherit"`;
   const lY = GROUND - clamp(t.H * 0.72, 72, 300);
   const lfs = clamp(t.H * 0.07, 13, 21).toFixed(0);
-  if (t.isFork) {
-    // 債券＝奥（上・控えめ）、株＝手前（下・はっきり）
-    labels += `<text x="${f1(CX + 30)}" y="${f1(lY - 34)}" ${tSty} font-size="${(+lfs - 2)}" fill="#3a847b" opacity="0.5">債券</text>`;
-    labels += `<text x="${f1(CX - 30)}" y="${f1(lY + 18)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.66">株</text>`;
-  } else {
-    labels += `<text x="${f1(CX)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
+  // 株＝上の樹冠。債券＝下の左右の支え枝（あれば）。
+  labels += `<text x="${f1(CX)}" y="${f1(lY)}" ${tSty} font-size="${lfs}" fill="#347a3d" opacity="0.62">株</text>`;
+  if (t.hasBond) {
+    const byL = GROUND - t.H * 0.30;
+    labels += `<text x="${f1(CX - t.H * 0.18 - 40)}" y="${f1(byL)}" ${tSty} font-size="${(+lfs - 2)}" fill="#2f8076" opacity="0.6">債券</text>`;
   }
   if (t.otherShare > 0.001) {
     labels += `<text x="${f1(CX - 88)}" y="${f1(GROUND - 22)}" ${tSty} font-size="13" fill="#a4633a" opacity="0.8">その他</text>`;
@@ -1006,10 +1006,7 @@ const LOAN_RATE = 0.03;    // 担保ローン金利（前提・調整可）
 
 // 幹の根元の太さ（切り株の太さの算出に使う）
 function trunkWidthOf(td) {
-  const ew = Math.max(5, td.equityGirth);
-  if (td.forkRatio <= 0.02) return ew;
-  const bw = Math.max(5, td.bondGirth);
-  return Math.max(ew, bw);   // 幹上端＝太い方の主枝（描画の stemTop と一致）
+  return Math.max(5, td.equityGirth);   // 幹＝株（本体）の太さ
 }
 
 const $ = id => document.getElementById(id);
@@ -1114,13 +1111,7 @@ function attachTreeInteractions(t) {
   svg.querySelectorAll(".hit").forEach(el => {
     el.addEventListener("click", (e) => {
       e.stopPropagation();
-      let part = el.getAttribute("data-part");
-      // 樹冠（葉）はクリックした左右で 株／債券 に振り分ける（左＝株, 右＝債券）
-      if (part === "leaves") {
-        const rectS = svg.getBoundingClientRect();
-        const localX = (e.clientX - rectS.left) / rectS.width * VW;
-        part = (t.isFork && localX >= CX) ? "bond" : "equity";
-      }
+      const part = el.getAttribute("data-part");
       const html = breakdownHTML(part, t);
       if (!html) return;
       bubble.innerHTML = html;
