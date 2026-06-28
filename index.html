@@ -322,7 +322,6 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
-      <div class="tree-hint">木の各パーツをタップすると、やさしい解説が出ます 🍃</div>
     </div>
 
     <div class="panel">
@@ -563,7 +562,7 @@ function deriveTree(s) {
 /* =========================================================================
    パラメトリックな木の描画（SVG） — §8 procedural
    ========================================================================= */
-const VW = 480, VH = 600, GROUND = 472, CX = 240;
+const VW = 480, VH = 524, GROUND = 472, CX = 240;
 
 function ribbon(x0, y0, w0, x1, y1, w1, c1x, c1y, c2x, c2y) {
   const wm = (w0 + w1) / 2;
@@ -840,10 +839,10 @@ function buildTree(t) {
     const a = rootAngs[i] * Math.PI / 180;
     const jitter = 0.72 + ((i * 7) % 5) / 11;     // 0.72〜1.08（決定的）
     const len = rootLen * jitter;
-    const x1 = CX + Math.cos(a) * len * 1.08;       // 横に広く張る
-    const y1 = GROUND - Math.sin(a) * len * 0.58;   // 縦は控えめ（枠内に収める）
-    const cx = CX + Math.cos(a) * len * 0.46;
-    const cy = GROUND - Math.sin(a) * len * 0.26 + 5;
+    const x1 = CX + Math.cos(a) * len * 1.14;       // 横に広く張る
+    const y1 = GROUND - Math.sin(a) * len * 0.34;   // 縦は浅め（地中を縦に詰める）
+    const cx = CX + Math.cos(a) * len * 0.5;
+    const cy = GROUND - Math.sin(a) * len * 0.16 + 5;
     const w = rootW * (0.55 + 0.45 * (1 - i / rootAngs.length));
     roots += `<path d="M ${f1(CX)} ${f1(GROUND-2)} Q ${f1(cx)} ${f1(cy)} ${f1(x1)} ${f1(y1)}" stroke="#b98f5e" stroke-width="${f1(w)}" fill="none" stroke-linecap="round" opacity="0.85"/>`;
   }
