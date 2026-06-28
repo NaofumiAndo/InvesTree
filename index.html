@@ -353,8 +353,8 @@
         <p class="needs-lead">売って減らすのではなく、これからの積立の振り分けで整えます。木は切らずに形が変わります。</p>
         <label>毎月の積立額 <span class="v" id="vContrib"></span></label>
         <input type="range" id="iContrib" min="0" max="30" step="1" value="5">
-        <label>これからの積立を債券にまわす割合 <span class="v" id="vBondAlloc"></span></label>
-        <input type="range" id="iBondAlloc" min="0" max="100" step="5" value="30">
+        <label>これからの積立を株にまわす割合 <span class="v" id="vEquityAlloc"></span></label>
+        <input type="range" id="iEquityAlloc" min="0" max="100" step="5" value="70">
         <label>何年後を見る <span class="v" id="vProjYears"></span></label>
         <input type="range" id="iProjYears" min="0" max="30" step="1" value="0">
         <div id="projResult" class="needs-result"></div>
@@ -1030,7 +1030,7 @@ let payMethod = "none";    // 急な出費への対応: none / sell / loan
 let needCash = 1000000;    // 必要な金額
 let restartYears = 0;      // 売却後に再積立してからの年数
 let contribMonthly = 50000; // これからの毎月の積立額
-let bondAlloc = 0.30;      // これからの積立を債券にまわす割合（残りは株）
+let equityAlloc = 0.70;    // これからの積立を株にまわす割合（残りは債券）
 let projYears = 0;         // 何年後を投影するか
 let projInfo = null;       // 投影中の表示情報
 const RETURN_RATE = 0.05;  // 運用利回り（前提・調整可）
@@ -1241,8 +1241,8 @@ function renderAll() {
   } else if (projYears > 0) {
     // 売らずに、これからの積立の振り分けで整える（N年後を投影）
     const addAmt = contribMonthly * 12 * projYears;
-    const fe = state.equity + addAmt * (1 - bondAlloc);
-    const fb = state.bond + addAmt * bondAlloc;
+    const fe = state.equity + addAmt * equityAlloc;
+    const fb = state.bond + addAmt * (1 - equityAlloc);
     t = deriveTree({ ...state, age: state.age + projYears, years: state.years + projYears, equity: fe, bond: fb });
     projInfo = { active: true, years: projYears, total: fe + fb + state.other, age: state.age + projYears };
   } else {
@@ -1278,7 +1278,7 @@ function renderAll() {
   $("vRestart").textContent = restartYears.toFixed(1) + "年";
   $("vNeedCash").textContent = manen(needCash);
   $("vContrib").textContent = (contribMonthly / 10000) + "万/月";
-  $("vBondAlloc").textContent = `債${Math.round(bondAlloc*100)}% : 株${100-Math.round(bondAlloc*100)}%`;
+  $("vEquityAlloc").textContent = `株${Math.round(equityAlloc*100)}% : 債${100-Math.round(equityAlloc*100)}%`;
   $("vProjYears").textContent = projYears > 0 ? projYears + "年後" : "いま";
   renderProfiles();
   attachTreeInteractions(t);
@@ -1316,7 +1316,7 @@ function renderHealth() {
 function renderProjChip() {
   const chip = $("projChip");
   const target = targetEquityPct(state.age);
-  const contribEqPct = (1 - bondAlloc) * 100;   // 新しい積立の株%
+  const contribEqPct = equityAlloc * 100;   // 新しい積立の株%
   const sb = state.equity + state.bond;
   let cls, txt;
   if (contribMonthly <= 0) {
@@ -1351,8 +1351,8 @@ function renderProj(t) {
   if (projYears <= 0) {
     el.innerHTML =
       `<div class="needs-row"><span class="lab">いまの年齢のおすすめ（${state.age}歳）</span><span class="num">株${Math.round(targetNow)}% : 債${100-Math.round(targetNow)}%</span></div>` +
-      `<div class="needs-row"><span class="lab">これからの積立</span><span class="num">株${100-Math.round(bondAlloc*100)}% : 債${Math.round(bondAlloc*100)}%</span></div>` +
-      `<div class="needs-note">「何年後を見る」を動かすと、これからの積立だけで木の形がどう整うかを投影します（売却なし）。年齢とともに債券へ多めにまわすと、おすすめ配分に沿って風が穏やかに。</div>`;
+      `<div class="needs-row"><span class="lab">これからの積立</span><span class="num">株${Math.round(equityAlloc*100)}% : 債${100-Math.round(equityAlloc*100)}%</span></div>` +
+      `<div class="needs-note">「何年後を見る」を動かすと、これからの積立だけで木の形がどう整うかを投影します（売却なし）。年齢とともに株を少なめにまわすと、おすすめ配分に沿って風が穏やかに。</div>`;
     return;
   }
   const futAge = state.age + projYears;
@@ -1364,7 +1364,7 @@ function renderProj(t) {
     `<div class="needs-row"><span class="lab">${projYears}年後の保有 株:債</span><span class="num">${eqPct}% : ${100-eqPct}%</span></div>` +
     `<div class="needs-row"><span class="lab">その年齢のおすすめ</span><span class="num">株${Math.round(futTarget)}% : 債${100-Math.round(futTarget)}%</span></div>` +
     `<div class="needs-row"><span class="lab">木の風</span><span class="num" style="color:${w.color}">${w.txt}</span></div>` +
-    `<div class="needs-note">売却ゼロ。これからの積立を債券に${Math.round(bondAlloc*100)}%まわした場合。おすすめ比率に近づくほど風が穏やかになります。</div>`;
+    `<div class="needs-note">売却ゼロ。これからの積立を株に${Math.round(equityAlloc*100)}%（債${100-Math.round(equityAlloc*100)}%）まわした場合。おすすめ比率に近づくほど風が穏やかになります。</div>`;
 }
 
 // 急な出費への対応：売る vs 担保ローン の比較（前提利回り・金利は概算）
@@ -1424,7 +1424,7 @@ $("iRestart").addEventListener("input", (e) => {
 });
 // これからの積立で年代に合わせる（売らずにリバランス）
 $("iContrib").addEventListener("input", (e) => { contribMonthly = (+e.target.value) * 10000; renderAll(); });
-$("iBondAlloc").addEventListener("input", (e) => { bondAlloc = (+e.target.value) / 100; renderAll(); });
+$("iEquityAlloc").addEventListener("input", (e) => { equityAlloc = (+e.target.value) / 100; renderAll(); });
 $("iProjYears").addEventListener("input", (e) => { projYears = +e.target.value; renderAll(); });
 $("resetBtn").addEventListener("click", () => selectProfile(activeId));
 
