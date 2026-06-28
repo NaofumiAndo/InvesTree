@@ -694,25 +694,24 @@ function buildTree(t) {
     t.isFork = true;
     const ew = Math.max(3, t.equityGirth * gs);   // 株の主枝＝分散度で太さが決まる
     const bw = Math.max(3, t.bondGirth * gs);     // 債券の主枝＝量で太さが決まる
-    // 幹は主枝とほぼ同じ細さ。分岐部は主枝を幹の内側に埋め込んで滑らかにつなぐ。
-    const trunkW = Math.max((ew + bw) * 0.6, Math.max(ew, bw) * 1.05);
-    newTrunkVisW = trunkW * 1.25;
+    // ★段差ゼロの構造：幹の上端の太さ＝「太い方の主枝の幅」。主枝はその上端と
+    //   同じ点・同じ幅から生えるので、樹高（H）が変わっても常にぴったり一致する。
+    const stemTop = Math.max(ew, bw);
+    newTrunkVisW = stemTop * 1.4;
     const Lf = t.H * 0.34;
     const fx = CX + Math.cos(trunkAng) * Lf, fy = baseY - Math.sin(trunkAng) * Lf;
     t.forkY = fy;
-    // 主枝の起点を幹の内側（下）に深めに埋め込み、分岐が幹の中から始まるように＝段差を消す
-    const sx = fx, syF = fy + Math.min(40, Lf * 0.34);
-    // 幹は根元フレア→上端を主枝より細く。主枝が幹を覆って自然に張り出し、段差を消す。
-    baseBucket.br += `<path d="${branchPath(CX, baseY, trunkW * 1.25, sx, syF, trunkW * 0.66)}"/>`;
+    // 幹：根元フレア → 上端 stemTop（太い方の主枝と一致）
+    baseBucket.br += `<path d="${branchPath(CX, baseY, stemTop * 1.4, fx, fy, stemTop)}"/>`;
     // 保有比率（金額）で枝葉の量感をスケール。50:50で同じ大きさ。
     const SB = t.equity + t.bond;
     const eqShare = SB > 0 ? t.equity / SB : 0.5, bdShare = 1 - eqShare;
     const baseLen = t.H * 0.26;
     const lenF = sh => 0.7 + 0.6 * sh;   // 0.5→1.0
     const leafF = sh => 0.55 + 0.9 * sh; // 0.5→1.0
-    // 株は手前・債券は奥。開きは控えめにして重なりで奥行きを出す。
-    grow(sx, syF, trunkAng - 0.16, baseLen * lenF(bdShare), bw, depth, tintBd, bdBucket, leafF(bdShare));  // 債券（奥）
-    grow(sx, syF, trunkAng + 0.17, baseLen * lenF(eqShare), ew, depth, tintEq, eqBucket, leafF(eqShare));  // 株（手前）
+    // 主枝は幹の上端(fx,fy)と同じ点から。株は手前・債券は奥（重なりで奥行き）。
+    grow(fx, fy, trunkAng - 0.16, baseLen * lenF(bdShare), bw, depth, tintBd, bdBucket, leafF(bdShare));  // 債券（奥）
+    grow(fx, fy, trunkAng + 0.17, baseLen * lenF(eqShare), ew, depth, tintEq, eqBucket, leafF(eqShare));  // 株（手前）
   }
 
   const strk = `stroke="#6b4f33" stroke-width="0.7" stroke-opacity="0.10" stroke-linejoin="round" stroke-linecap="round"`;
@@ -1010,7 +1009,7 @@ function trunkWidthOf(td) {
   const ew = Math.max(5, td.equityGirth);
   if (td.forkRatio <= 0.02) return ew;
   const bw = Math.max(5, td.bondGirth);
-  return Math.max((ew + bw) * 0.60, Math.max(ew, bw) * 1.12);
+  return Math.max(ew, bw);   // 幹上端＝太い方の主枝（描画の stemTop と一致）
 }
 
 const $ = id => document.getElementById(id);
