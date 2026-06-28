@@ -350,7 +350,7 @@
 
       <details class="box needs">
         <summary>③ 🍃 これからの積立 <span id="projChip" class="sum-chip"></span></summary>
-        <p class="needs-lead">売って減らすのではなく、これからの積立の振り分けで整えます。木は切らずに形が変わります。</p>
+        <p class="needs-lead">売って減らすと、利益に約20%の税金がかかります。売らずに、これから買い付ける分の振り分けだけで整えれば、税金をかけずに形を近づけられて結局お得。木は切らずに形が変わります。</p>
         <label>毎月の積立額 <span class="v" id="vContrib"></span></label>
         <input type="range" id="iContrib" min="0" max="30" step="1" value="5">
         <label>これからの積立を株にまわす割合 <span class="v" id="vEquityAlloc"></span></label>
@@ -1364,7 +1364,7 @@ function renderProj(t) {
     `<div class="needs-row"><span class="lab">${projYears}年後の保有 株:債</span><span class="num">${eqPct}% : ${100-eqPct}%</span></div>` +
     `<div class="needs-row"><span class="lab">その年齢のおすすめ</span><span class="num">株${Math.round(futTarget)}% : 債${100-Math.round(futTarget)}%</span></div>` +
     `<div class="needs-row"><span class="lab">木の風</span><span class="num" style="color:${w.color}">${w.txt}</span></div>` +
-    `<div class="needs-note">売却ゼロ。これからの積立を株に${Math.round(equityAlloc*100)}%（債${100-Math.round(equityAlloc*100)}%）まわした場合。おすすめ比率に近づくほど風が穏やかになります。</div>`;
+    `<div class="needs-note">売却ゼロ＝利益への課税（約20%）なし。これから買う分を株に${Math.round(equityAlloc*100)}%（債${100-Math.round(equityAlloc*100)}%）まわして近づけた場合。売って整えるより、税金がかからない分だけ結局お得です。</div>`;
 }
 
 // 急な出費への対応：売る vs 担保ローン の比較（前提利回り・金利は概算）
