@@ -203,6 +203,7 @@
   .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
   /* 商品が増えても枠内でスクロール */
   .bubble .bd-list { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; }
+  .root-ico { vertical-align: -3px; }
 
   /* side panel */
   .panel {
@@ -328,7 +329,7 @@
 
     <div class="panel">
       <details class="box needs">
-        <summary>① 🌱 目先の備え <span id="needsChip" class="sum-chip"></span></summary>
+        <summary>① <svg class="root-ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><g fill="none" stroke="#a17a49" stroke-width="1.7" stroke-linecap="round"><path d="M12 2L12 12"/><path d="M12 8C9 10 7.5 13 7 18"/><path d="M12 8C15 10 16.5 13 17 18"/><path d="M12 12C10.5 15 10 17 9.5 21"/><path d="M12 12C13.5 15 14 17 14.5 21"/></g></svg> 目先の備え <span id="needsChip" class="sum-chip"></span></summary>
         <p class="needs-lead">まず生活防衛資金と目先の出費を現金で確保。満たせているか、残りは投資にまわせる余力かを見ます。</p>
         <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
         <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
@@ -962,6 +963,8 @@ function buildTree(t) {
 // クリックされたパーツの「投資の内訳」を返す（株＝左の枝・債券＝右の枝・鉢＝その他）
 function breakdownHTML(part, t) {
   const yen = v => "¥" + Math.round(v).toLocaleString();
+  // 現金＝木の根。芽ではなく根そのもので表す（カードのアイコンと共通）。
+  const ROOT_ICO = `<svg class="root-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><g fill="none" stroke="#a17a49" stroke-width="1.7" stroke-linecap="round"><path d="M12 2L12 12"/><path d="M12 8C9 10 7.5 13 7 18"/><path d="M12 8C15 10 16.5 13 17 18"/><path d="M12 12C10.5 15 10 17 9.5 21"/><path d="M12 12C13.5 15 14 17 14.5 21"/></g></svg>`;
   const p = currentProfile();
   const itemsOf = cls => (!custom ? p.holdings.filter(h => h.assetClass === cls) : []);
   const head = (label, total, accent) =>
@@ -992,7 +995,7 @@ function breakdownHTML(part, t) {
     }
     case "roots": {
       const cash = state.cash, nec = t.necessaryCash || 0, over = t.excessCash || 0;
-      let s = head("🌱 現金（土台）", cash, "#5b8f5b");
+      let s = head(`${ROOT_ICO} 現金（土台）`, cash, "#5b8f5b");
       s += `<div class="bd-row"><span class="bd-nm">必要な土台</span><span class="bd-amt">${yen(nec)}</span></div>`;
       s += over > 0
         ? `<div class="bd-row"><span class="bd-nm">投資にまわせる余力</span><span class="bd-amt">${yen(over)}</span></div>`
