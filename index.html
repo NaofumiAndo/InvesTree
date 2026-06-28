@@ -263,6 +263,21 @@
   .dot.bond { background: #c79a5b; }
   .dot.other { background: #d98ba8; }
   .holding .amt2 { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  /* 資産クラスごとの折りたたみ（タップで中身の商品を展開） */
+  .hold-group { border-bottom: 1px dashed #ecdfc8; }
+  .hold-group > summary {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 0; font-size: 13px; cursor: pointer; list-style: none;
+  }
+  .hold-group > summary::-webkit-details-marker { display: none; }
+  .hold-group .nm { display: flex; align-items: center; gap: 7px; }
+  .hold-group .amt2 { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .hold-group .chev { display: inline-block; width: 9px; color: var(--ink-soft); transition: transform .15s ease; }
+  .hold-group .chev::before { content: "\203A"; }
+  .hold-group[open] > summary .chev { transform: rotate(90deg); }
+  .hold-items { padding: 0 0 7px 27px; }
+  .holding.sub { border-bottom: none; padding: 3px 0; font-size: 12px; }
+  .holding.sub .nm { color: var(--ink-soft); }
 
   .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
   .metric { font-size: 12px; }
@@ -1101,25 +1116,46 @@ function readSliders() {
   renderAll();
 }
 
+let openHoldGroups = new Set();   // 展開中の資産クラス（再描画で畳まれないよう保持）
+
 function renderHoldings(t) {
   const p = currentProfile();
   const host = $("holdings");
+  const man = amt => `${(amt/10000).toLocaleString()}万円`;
+  const cashRow = amt =>
+    `<div class="holding"><div class="nm"><span class="dot" style="background:#bcbcbc"></span>現金（生活防衛資金）</div><div class="amt2">${man(amt)}</div></div>`;
   if (custom) {
-    const rows = [
-      ["株式", "equity", state.equity],
-      ["債券", "bond", state.bond],
-      ["その他資産", "other", state.other],
-      ["現金", "other", state.cash],
-    ];
+    // カスタムは中身の商品が無いのでクラス合計だけ表示
+    const rows = [["株式", "equity", state.equity], ["債券", "bond", state.bond], ["その他資産", "other", state.other]];
     host.innerHTML = rows.map(([nm, cls, amt]) =>
-      `<div class="holding"><div class="nm"><span class="dot ${cls}"></span>${nm}</div><div class="amt2">${(amt/10000).toLocaleString()}万円</div></div>`
-    ).join("");
+      `<div class="holding"><div class="nm"><span class="dot ${cls}"></span>${nm}</div><div class="amt2">${man(amt)}</div></div>`
+    ).join("") + cashRow(state.cash);
     return;
   }
-  host.innerHTML = p.holdings.map(h =>
-    `<div class="holding"><div class="nm"><span class="dot ${h.assetClass}"></span>${h.name}</div><div class="amt2">${(h.amount/10000).toLocaleString()}万円</div></div>`
-  ).join("")
-  + `<div class="holding"><div class="nm"><span class="dot other" style="background:#bcbcbc"></span>現金（生活防衛資金）</div><div class="amt2">${(p.cash/10000).toLocaleString()}万円</div></div>`;
+  // プロフィール：資産クラスごとに集約。既定は合計のみ、タップで中身の商品を展開。
+  const groups = [["株式", "equity"], ["債券", "bond"], ["その他資産", "other"]];
+  let html = "";
+  for (const [nm, cls] of groups) {
+    const items = p.holdings.filter(h => h.assetClass === cls);
+    if (!items.length) continue;
+    const tot = items.reduce((a, h) => a + h.amount, 0);
+    const open = openHoldGroups.has(cls) ? " open" : "";
+    const inner = items.map(h =>
+      `<div class="holding sub"><div class="nm">${h.name}</div><div class="amt2">${man(h.amount)}</div></div>`
+    ).join("");
+    html += `<details class="hold-group" data-cls="${cls}"${open}>`
+      + `<summary><div class="nm"><span class="chev"></span><span class="dot ${cls}"></span>${nm}</div><div class="amt2">${man(tot)}</div></summary>`
+      + `<div class="hold-items">${inner}</div></details>`;
+  }
+  html += cashRow(p.cash);
+  host.innerHTML = html;
+  // 開閉状態を保持
+  host.querySelectorAll("details.hold-group").forEach(d => {
+    d.addEventListener("toggle", () => {
+      const c = d.getAttribute("data-cls");
+      if (d.open) openHoldGroups.add(c); else openHoldGroups.delete(c);
+    });
+  });
 }
 
 function renderBalance(t) {
