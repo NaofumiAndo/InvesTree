@@ -200,7 +200,8 @@
     padding: 2px 0; font-size: 12px;
   }
   .bubble .bd-nm { color: var(--ink-soft); }
-  .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+  .bubble .bd-meta { display: block; font-size: 10.5px; color: var(--ink-soft); opacity: 0.75; margin-top: 1px; }
+  .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
 
   /* side panel */
   .panel {
@@ -964,17 +965,37 @@ function breakdownHTML(part, t) {
   const itemsOf = cls => (!custom ? p.holdings.filter(h => h.assetClass === cls) : []);
   const head = (label, total, accent) =>
     `<div class="bd-head" style="color:${accent || 'var(--ink)'}">${label}<span class="bd-total">${yen(total)}</span></div>`;
+  // 商品行（名前の下に「分散の度合い」や「リスク」を小さく添える）
+  const rowMeta = (nm, amt, meta) =>
+    `<div class="bd-row"><span class="bd-nm">${nm}${meta ? `<span class="bd-meta">${meta}</span>` : ""}</span><span class="bd-amt">${yen(amt)}</span></div>`;
   const rowsFor = (cls, fallbackLabel, fallbackAmt) => {
     const list = itemsOf(cls);
-    if (list.length) return list.map(h =>
-      `<div class="bd-row"><span class="bd-nm">${h.name}</span><span class="bd-amt">${yen(h.amount)}</span></div>`).join("");
-    return `<div class="bd-row"><span class="bd-nm">${fallbackLabel}</span><span class="bd-amt">${yen(fallbackAmt)}</span></div>`;
+    if (list.length) return list.map(h => rowMeta(h.name, h.amount)).join("");
+    return rowMeta(fallbackLabel, fallbackAmt, null);
   };
+  // 株：1銘柄集中か／何銘柄に分散しているか
+  const eqMeta = h => h.distinctSecurities <= 1 ? "1銘柄に集中" : `実質${h.distinctSecurities.toLocaleString()}銘柄に分散`;
+  // 債券：リスク階級＋分散（投信なら中身の本数）
+  const bondRiskLabel = { low: "国債級・低リスク", mid: "優良社債級・中リスク", high: "社債/新興国・高リスク" };
+  const bdMeta = h => `${bondRiskLabel[h.riskTier] || "中リスク"}・${h.distinctSecurities <= 1 ? "1本" : `実質${h.distinctSecurities.toLocaleString()}本に分散`}`;
   switch (part) {
-    case "equity":
-      return head("🌳 株式", state.equity, "#4f8a52") + rowsFor("equity", "株式", state.equity);
-    case "bond":
-      return head("🌿 債券", state.bond, "#a9803b") + rowsFor("bond", "債券", state.bond);
+    case "equity": {
+      const list = itemsOf("equity");
+      const rows = list.length ? list.map(h => rowMeta(h.name, h.amount, eqMeta(h))).join("") : rowMeta("株式", state.equity, null);
+      return head("🌳 株式", state.equity, "#4f8a52") + rows;
+    }
+    case "bond": {
+      const list = itemsOf("bond");
+      const rows = list.length ? list.map(h => rowMeta(h.name, h.amount, bdMeta(h))).join("") : rowMeta("債券", state.bond, null);
+      // 全体の安全度（リスク×集中度から算出した支え枝の頼もしさ）
+      let note = "";
+      if (state.bond > 0 && t.bondQuality != null) {
+        const q = t.bondQuality;
+        const qlab = q >= 0.8 ? "頼もしい（太い支え枝）" : q >= 0.5 ? "まずまず" : "頼りない（細く垂れる）";
+        note = `<div class="bd-row" style="color:var(--ink-soft);font-size:11.5px;border:none">支えの安全度：${qlab}<br>国債か分散投信のどちらかで太く安定します。</div>`;
+      }
+      return head("🌿 債券", state.bond, "#a9803b") + rows + note;
+    }
     case "other":
       return head("🪴 その他資産", state.other, "#c2703a") + rowsFor("other", "その他", state.other);
     case "fruit": {
@@ -1125,9 +1146,20 @@ function renderBalance(t) {
   const total = state.equity + state.bond + state.other;
   $("who").textContent = custom ? "カスタム設定" : `${p.name}・${p.note}`;
   $("amt").textContent = "¥" + total.toLocaleString();
-  // 擬似的な前日比（葉の色イメージ）
-  const delta = (total * 0.0042);
-  $("delta").textContent = `前日比 +¥${Math.round(delta).toLocaleString()} (+0.42%)`;
+  // 中長期投資なので「前日比」ではなく、これまでの合計運用益（概算）を表示。
+  const { gain, principal } = estimateGain(total, state.years);
+  const pct = principal > 0 ? (gain / principal * 100) : 0;
+  $("delta").textContent = `運用益（概算） +¥${Math.round(gain).toLocaleString()} (+${pct.toFixed(1)}%)`;
+}
+
+// 積立（毎月定額）を年率 RETURN_RATE で years 続けた、と仮定して元本と運用益を概算。
+// FV=現在額 から元本を逆算：principal/FV = 月数 / 積立係数。years=0 なら運用益0。
+function estimateGain(total, years) {
+  const i = RETURN_RATE / 12;
+  const n = Math.max(1, Math.round((years || 0) * 12));
+  const factor = (Math.pow(1 + i, n) - 1) / i;     // 毎月1円積立の将来価値（積立係数）
+  const principal = total * clamp(n / factor, 0, 1);
+  return { gain: Math.max(0, total - principal), principal };
 }
 
 function attachTreeInteractions(t) {
