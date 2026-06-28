@@ -185,7 +185,7 @@
     transition: opacity .15s ease, transform .15s ease;
     pointer-events: none;
   }
-  .bubble.show { opacity: 1; transform: translateY(0); }
+  .bubble.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
   .bubble b { color: var(--accent-dk); }
   /* クリックで出る投資の内訳 */
   .bubble .bd-head {
@@ -200,8 +200,11 @@
     padding: 2px 0; font-size: 12px;
   }
   .bubble .bd-nm { color: var(--ink-soft); }
-  .bubble .bd-meta { display: block; font-size: 10.5px; color: var(--ink-soft); opacity: 0.75; margin-top: 1px; }
   .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
+  /* 商品が増えても枠内でスクロール */
+  .bubble .bd-list { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; }
+  .bubble .bd-note { margin-top: 6px; padding-top: 5px; border-top: 1px solid #ecdfc8;
+    font-size: 11.5px; color: var(--ink-soft); line-height: 1.45; }
 
   /* side panel */
   .panel {
@@ -965,39 +968,30 @@ function breakdownHTML(part, t) {
   const itemsOf = cls => (!custom ? p.holdings.filter(h => h.assetClass === cls) : []);
   const head = (label, total, accent) =>
     `<div class="bd-head" style="color:${accent || 'var(--ink)'}">${label}<span class="bd-total">${yen(total)}</span></div>`;
-  // 商品行（名前の下に「分散の度合い」や「リスク」を小さく添える）
-  const rowMeta = (nm, amt, meta) =>
-    `<div class="bd-row"><span class="bd-nm">${nm}${meta ? `<span class="bd-meta">${meta}</span>` : ""}</span><span class="bd-amt">${yen(amt)}</span></div>`;
+  const row = (nm, amt) =>
+    `<div class="bd-row"><span class="bd-nm">${nm}</span><span class="bd-amt">${yen(amt)}</span></div>`;
+  // 商品が増えても枠内でスクロールして読める
+  const scroll = rowsHTML => `<div class="bd-list">${rowsHTML}</div>`;
   const rowsFor = (cls, fallbackLabel, fallbackAmt) => {
     const list = itemsOf(cls);
-    if (list.length) return list.map(h => rowMeta(h.name, h.amount)).join("");
-    return rowMeta(fallbackLabel, fallbackAmt, null);
+    if (list.length) return list.map(h => row(h.name, h.amount)).join("");
+    return row(fallbackLabel, fallbackAmt);
   };
-  // 株：1銘柄集中か／何銘柄に分散しているか
-  const eqMeta = h => h.distinctSecurities <= 1 ? "1銘柄に集中" : `実質${h.distinctSecurities.toLocaleString()}銘柄に分散`;
-  // 債券：リスク階級＋分散（投信なら中身の本数）
-  const bondRiskLabel = { low: "国債級・低リスク", mid: "優良社債級・中リスク", high: "社債/新興国・高リスク" };
-  const bdMeta = h => `${bondRiskLabel[h.riskTier] || "中リスク"}・${h.distinctSecurities <= 1 ? "1本" : `実質${h.distinctSecurities.toLocaleString()}本に分散`}`;
   switch (part) {
-    case "equity": {
-      const list = itemsOf("equity");
-      const rows = list.length ? list.map(h => rowMeta(h.name, h.amount, eqMeta(h))).join("") : rowMeta("株式", state.equity, null);
-      return head("🌳 株式", state.equity, "#4f8a52") + rows;
-    }
+    case "equity":
+      return head("🌳 株式", state.equity, "#4f8a52") + scroll(rowsFor("equity", "株式", state.equity));
     case "bond": {
-      const list = itemsOf("bond");
-      const rows = list.length ? list.map(h => rowMeta(h.name, h.amount, bdMeta(h))).join("") : rowMeta("債券", state.bond, null);
       // 全体の安全度（リスク×集中度から算出した支え枝の頼もしさ）
       let note = "";
       if (state.bond > 0 && t.bondQuality != null) {
         const q = t.bondQuality;
         const qlab = q >= 0.8 ? "頼もしい（太い支え枝）" : q >= 0.5 ? "まずまず" : "頼りない（細く垂れる）";
-        note = `<div class="bd-row" style="color:var(--ink-soft);font-size:11.5px;border:none">支えの安全度：${qlab}<br>国債か分散投信のどちらかで太く安定します。</div>`;
+        note = `<div class="bd-note">支えの安全度：${qlab}<br>国債か分散投信のどちらかで太く安定します。</div>`;
       }
-      return head("🌿 債券", state.bond, "#a9803b") + rows + note;
+      return head("🌿 債券", state.bond, "#a9803b") + scroll(rowsFor("bond", "債券", state.bond)) + note;
     }
     case "other":
-      return head("🪴 その他資産", state.other, "#c2703a") + rowsFor("other", "その他", state.other);
+      return head("🪴 その他資産", state.other, "#c2703a") + scroll(rowsFor("other", "その他", state.other));
     case "fruit": {
       const total = state.equity + state.bond + state.other;
       const income = total * 0.04;
