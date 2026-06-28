@@ -277,7 +277,8 @@
   .hold-group[open] > summary .chev { transform: rotate(90deg); }
   .hold-items { padding: 0 0 7px 27px; }
   .holding.sub { border-bottom: none; padding: 3px 0; font-size: 12px; }
-  .holding.sub .nm { color: var(--ink-soft); }
+  .holding.sub .nm { color: var(--ink-soft); flex-wrap: wrap; }
+  .part { display: block; width: 100%; font-size: 10.5px; color: var(--ink-soft); opacity: 0.7; }
 
   .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; }
   .metric { font-size: 12px; }
@@ -506,6 +507,22 @@ const PROFILES = [
     ],
     cash: 100000,
   },
+  {
+    id: "wrap",
+    emoji: "⚖️",
+    label: "バランス型ファンド派",
+    name: "さくら（45歳）",
+    note: "のむラップ積極型 中心",
+    age: 45,
+    start: "2019-04-01",
+    holdings: [
+      // バランス型ファンド：mix（基本配分の概算）で株/債/その他に按分される。実際は月次で変動。
+      { name: "のむラップ・ファンド（積極型）", amount: 3000000,
+        mix: { equity: 0.68, bond: 0.14, other: 0.18 }, distinctSecurities: 2000, riskTier: "mid" },
+      { name: "eMAXIS Slim 全世界株式（オルカン）", assetClass: "equity", amount: 1000000, distinctSecurities: 3000 },
+    ],
+    cash: 500000,
+  },
 ];
 
 /* =========================================================================
@@ -526,6 +543,21 @@ function yearsFrom(dateStr) {
 // 債券のリスク階級 → 係数（小=ほぼ安全 … 大=株1銘柄級の信用リスク）
 const BOND_RISK_COEF = { low: 0.12, mid: 0.5, high: 1.0 };
 
+// 1商品を資産クラスへ按分。バランス型ファンドは mix（構成比）で株/債/その他に分割。
+// 通常商品は assetClass にそのまま全額。
+function holdingSplit(h) {
+  if (h.mix) {
+    return {
+      equity: h.amount * (h.mix.equity || 0),
+      bond:   h.amount * (h.mix.bond   || 0),
+      other:  h.amount * (h.mix.other  || 0),
+    };
+  }
+  const s = { equity: 0, bond: 0, other: 0 };
+  s[h.assetClass] = h.amount;
+  return s;
+}
+
 /** 保有商品 → スライダーが操作する生の状態へ */
 function profileToState(p) {
   let eq = 0, bd = 0, ot = 0;
@@ -534,13 +566,15 @@ function profileToState(p) {
   // 債券も同じくルックスルーで分散を測り（投信は中身の本数）、リスクは金額加重平均
   let bdWeighted = 0, bdRiskWeighted = 0;
   for (const h of p.holdings) {
-    if (h.assetClass === "equity") { eq += h.amount; eqWeighted += h.amount * Math.log10(Math.max(1, h.distinctSecurities)); }
-    else if (h.assetClass === "bond") {
-      bd += h.amount;
-      bdWeighted += h.amount * Math.log10(Math.max(1, h.distinctSecurities || 1));
-      bdRiskWeighted += h.amount * (BOND_RISK_COEF[h.riskTier] ?? 0.5);
+    const sp = holdingSplit(h);
+    const breadth = Math.log10(Math.max(1, h.distinctSecurities || 1));
+    if (sp.equity > 0) { eq += sp.equity; eqWeighted += sp.equity * breadth; }
+    if (sp.bond > 0) {
+      bd += sp.bond;
+      bdWeighted += sp.bond * breadth;
+      bdRiskWeighted += sp.bond * (BOND_RISK_COEF[h.riskTier] ?? 0.5);
     }
-    else ot += h.amount;
+    if (sp.other > 0) ot += sp.other;
   }
   const divScore = eq > 0 ? eqWeighted / eq : 0;
   // 複数商品でも、商品をまたいで「透かして」発行体数を合算 → 分散はここで上がる
@@ -981,7 +1015,9 @@ function breakdownHTML(part, t) {
   // 現金＝木の根。芽ではなく根そのもので表す（カードのアイコンと共通）。
   const ROOT_ICO = `<svg class="root-ico" viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><g fill="none" stroke="#a17a49" stroke-width="1.7" stroke-linecap="round"><path d="M12 2L12 12"/><path d="M12 8C9 10 7.5 13 7 18"/><path d="M12 8C15 10 16.5 13 17 18"/><path d="M12 12C10.5 15 10 17 9.5 21"/><path d="M12 12C13.5 15 14 17 14.5 21"/></g></svg>`;
   const p = currentProfile();
-  const itemsOf = cls => (!custom ? p.holdings.filter(h => h.assetClass === cls) : []);
+  const partLabel = { equity: "株式部分", bond: "債券部分", other: "その他部分" };
+  // 各商品のこのクラスへの按分（バランス型は mix で分割）
+  const itemsOf = cls => (!custom ? p.holdings.map(h => ({ h, amt: holdingSplit(h)[cls] })).filter(x => x.amt > 0) : []);
   const head = (label, total, accent) =>
     `<div class="bd-head" style="color:${accent || 'var(--ink)'}">${label}<span class="bd-total">${yen(total)}</span></div>`;
   const row = (nm, amt) =>
@@ -990,7 +1026,8 @@ function breakdownHTML(part, t) {
   const scroll = rowsHTML => `<div class="bd-list">${rowsHTML}</div>`;
   const rowsFor = (cls, fallbackLabel, fallbackAmt) => {
     const list = itemsOf(cls);
-    if (list.length) return list.map(h => row(h.name, h.amount)).join("");
+    if (list.length) return list.map(({ h, amt }) =>
+      row(h.mix ? `${h.name}（${partLabel[cls]}）` : h.name, amt)).join("");
     return row(fallbackLabel, fallbackAmt);
   };
   switch (part) {
@@ -1134,15 +1171,18 @@ function renderHoldings(t) {
   }
   // プロフィール：資産クラスごとに集約。既定は合計のみ、タップで中身の商品を展開。
   const groups = [["株式", "equity"], ["債券", "bond"], ["その他資産", "other"]];
+  const partLabel = { equity: "株式部分", bond: "債券部分", other: "その他部分" };
   let html = "";
   for (const [nm, cls] of groups) {
-    const items = p.holdings.filter(h => h.assetClass === cls);
+    // 各商品のこのクラスへの按分額（バランス型は mix で分割される）
+    const items = p.holdings.map(h => ({ h, amt: holdingSplit(h)[cls] })).filter(x => x.amt > 0);
     if (!items.length) continue;
-    const tot = items.reduce((a, h) => a + h.amount, 0);
+    const tot = items.reduce((a, x) => a + x.amt, 0);
     const open = openHoldGroups.has(cls) ? " open" : "";
-    const inner = items.map(h =>
-      `<div class="holding sub"><div class="nm">${h.name}</div><div class="amt2">${man(h.amount)}</div></div>`
-    ).join("");
+    const inner = items.map(({ h, amt }) => {
+      const nameHtml = h.mix ? `${h.name}<span class="part">バランス型の${partLabel[cls]}</span>` : h.name;
+      return `<div class="holding sub"><div class="nm">${nameHtml}</div><div class="amt2">${man(amt)}</div></div>`;
+    }).join("");
     html += `<details class="hold-group" data-cls="${cls}"${open}>`
       + `<summary><div class="nm"><span class="chev"></span><span class="dot ${cls}"></span>${nm}</div><div class="amt2">${man(tot)}</div></summary>`
       + `<div class="hold-items">${inner}</div></details>`;
