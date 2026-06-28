@@ -137,6 +137,11 @@
   .cash-badge .amt-s { color: #c2703a; font-weight: 700; }
 
   .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
+  .sum-chip { margin-left: auto; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 9px; white-space: nowrap; }
+  .sum-chip.ok    { background: #e7f3e2; color: #4f8a52; }
+  .sum-chip.warn  { background: #fdeccd; color: #c2872f; }
+  .sum-chip.bad   { background: #f7ddcb; color: #c2703a; }
+  details.box > summary { flex-wrap: wrap; }
   .sell-toggle { display: flex !important; align-items: center; gap: 8px; justify-content: flex-start !important; font-size: 13px; color: var(--ink); margin: 4px 0 2px; cursor: pointer; }
   .sell-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
   .method-row { display: flex; gap: 8px; margin: 10px 0 4px; }
@@ -350,7 +355,7 @@
 
     <div class="panel">
       <details class="box needs">
-        <summary>① 🪴 足元の安心（流動性の確保）</summary>
+        <summary>① 🪴 目先の備え <span id="needsChip" class="sum-chip"></span></summary>
         <p class="needs-lead">まず生活防衛資金と目先の出費を現金で確保。満たせているか、残りは投資にまわせる余力かを見ます。</p>
         <label>毎月の生活費 <span class="v" id="vMonthly"></span></label>
         <input type="range" id="iMonthly" min="5" max="60" step="1" value="25">
@@ -361,9 +366,12 @@
         <div id="needsResult" class="needs-result"></div>
       </details>
 
-      <details class="box">
-        <summary>② 🌳 保有商品（中長期の投資） <span id="customTag"></span></summary>
-        <div id="holdings"></div>
+      <details class="box needs">
+        <summary>② 🌳 保有商品（中長期の投資） <span id="holdChip" class="sum-chip"></span> <span id="customTag"></span></summary>
+        <label>退職を想定する年齢 <span class="v" id="vRetire"></span></label>
+        <input type="range" id="iRetire" min="50" max="80" step="1" value="65">
+        <div id="holdHealth" class="needs-result"></div>
+        <div id="holdings" style="margin-top:10px"></div>
       </details>
 
       <details class="box needs">
@@ -512,6 +520,12 @@ const PROFILES = [
    ========================================================================= */
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
+let retireAge = 65;   // 退職を想定する年齢（ユーザー設定）
+// 年代のおすすめ株式比率（グライドパス）：退職想定年まで遠いほど株多め、近づくほど債券へ。
+function targetEquityPct(age) {
+  return clamp((retireAge - age) * 2 + 30, 20, 90);
+}
+
 function yearsFrom(dateStr) {
   return (TODAY - new Date(dateStr)) / (365.25 * 24 * 3600 * 1000);
 }
@@ -554,8 +568,8 @@ function deriveTree(s) {
   const bondGirth = Math.min(50, 100 * bondShareSB) * heightFactor; // 50:50で株と並ぶ太さ
   const forkRatio = bondShareSB; // 0=1本幹, 0.5=対称
 
-  // 風＝年齢相応リスクとのズレ（§3-3）
-  const target = clamp(110 - s.age, 20, 90);
+  // 風＝年齢相応リスクとのズレ（§3-3）。退職想定年までの距離でおすすめ株比率が決まる。
+  const target = targetEquityPct(s.age);
   const equityPctSB = sb > 0 ? (s.equity / sb) * 100 : 0;
   const gap = sb > 0 ? equityPctSB - target : 0;
   // 小さなズレ(±10%程度)は許容しそよ風。それを超えて株が過剰なほど強風に。
@@ -1162,6 +1176,11 @@ function renderNeeds(nd) {
   $("vMonths").textContent = nd.months + "ヶ月分";
   $("vNear").textContent = manen(nd.nearTerm);
 
+  // 折りたたみ時もパッと見えるサマリーチップ
+  const chip = $("needsChip");
+  if (cov >= 1) { chip.className = "sum-chip ok"; chip.textContent = `✓ 余力 ${manen(Math.max(0, over))}`; }
+  else { chip.className = "sum-chip bad"; chip.textContent = `${manen(nd.necessary - cash)} 不足`; }
+
   const verdict = cov >= 1
     ? `<div class="needs-verdict ok">✅ 土台クリア｜投資にまわせる余力 ${manen(Math.max(0, over))}</div>
        <div class="needs-note">余力は木を育てる種。つみたて投資にまわせます。</div>`
@@ -1236,6 +1255,7 @@ function renderAll() {
   renderHoldings(t);
   renderNeeds(nd);
   renderCashBadge(nd);
+  renderHealth();
   renderMethod();
   renderProj(t);
   // slider value labels
@@ -1255,10 +1275,38 @@ function renderAll() {
   attachTreeInteractions(t);
 }
 
+// 保有商品の健康状態（年齢＋退職想定年に対して株:債が適切か）
+function renderHealth() {
+  $("vRetire").textContent = retireAge + "歳";
+  const chip = $("holdChip"), detail = $("holdHealth");
+  const sb = state.equity + state.bond;
+  const ytr = Math.max(0, retireAge - state.age);
+  const target = targetEquityPct(state.age);
+  if (sb <= 0) {
+    chip.className = "sum-chip warn"; chip.textContent = "投資なし";
+    detail.innerHTML = `<div class="needs-note">中長期の投資（株・債券）がまだありません。余力ができたら少しずつ。</div>`;
+    return;
+  }
+  const eqPct = Math.round(state.equity / sb * 100);
+  const gap = eqPct - target;
+  let cls, txt, note;
+  if (gap > 25)       { cls = "bad";  txt = "株が過剰";   note = "年代に対して株が多すぎます。これからの積立を債券へ多めに振り、売らずに整えましょう。"; }
+  else if (gap > 10)  { cls = "warn"; txt = "やや株多め"; note = "少し株寄り。積立の振り分けを債券に寄せると年代に合っていきます。"; }
+  else if (gap < -15) { cls = "warn"; txt = "守りすぎ";   note = "やや保守的。退職までまだ距離があるなら、もう少し株を増やす余地があります。"; }
+  else                { cls = "ok";   txt = "年代に合う"; note = "年齢と退職想定に対してバランス良好です。"; }
+  chip.className = "sum-chip " + cls; chip.textContent = (cls === "ok" ? "🍃 " : cls === "bad" ? "🌪️ " : "🌬️ ") + txt;
+  detail.innerHTML =
+    `<div class="needs-row"><span class="lab">退職まで</span><span class="num">${ytr}年（${retireAge}歳想定）</span></div>` +
+    `<div class="needs-row"><span class="lab">年代のおすすめ 株:債</span><span class="num">${Math.round(target)}% : ${100 - Math.round(target)}%</span></div>` +
+    `<div class="needs-row"><span class="lab">いまの 株:債</span><span class="num">${eqPct}% : ${100 - eqPct}%</span></div>` +
+    `<div class="needs-verdict ${cls === "ok" ? "ok" : "short"}">${chip.textContent}</div>` +
+    `<div class="needs-note">${note}</div>`;
+}
+
 // これからの積立で年代に合わせる（売らずにリバランス）＋ 年代のおすすめ配分
 function renderProj(t) {
   const el = $("projResult");
-  const targetNow = clamp(110 - state.age, 20, 90);
+  const targetNow = targetEquityPct(state.age);
   if (projYears <= 0) {
     el.innerHTML =
       `<div class="needs-row"><span class="lab">いまの年代のおすすめ（${state.age}歳）</span><span class="num">株${Math.round(targetNow)}% : 債${100-Math.round(targetNow)}%</span></div>` +
@@ -1266,7 +1314,7 @@ function renderProj(t) {
     return;
   }
   const futAge = state.age + projYears;
-  const futTarget = clamp(110 - futAge, 20, 90);
+  const futTarget = targetEquityPct(futAge);
   const eqPct = (t.equity + t.bond) > 0 ? Math.round(t.equityPctSB) : 0;
   const w = windLabel(t.wind, t.gap);
   el.innerHTML =
@@ -1327,6 +1375,7 @@ document.querySelectorAll(".method-btn").forEach(btn => {
   });
 });
 $("iNeedCash").addEventListener("input", (e) => { needCash = (+e.target.value) * 10000; renderAll(); });
+$("iRetire").addEventListener("input", (e) => { retireAge = +e.target.value; renderAll(); });
 $("iRestart").addEventListener("input", (e) => {
   restartYears = +e.target.value;
   renderAll();
