@@ -110,32 +110,6 @@
     overflow: hidden;
     position: relative;
   }
-  .cash-badge {
-    position: absolute;
-    left: 16px;
-    bottom: 36px;
-    z-index: 3;
-    max-width: 78%;
-    background: rgba(255,255,255,0.82);
-    backdrop-filter: blur(3px);
-    border-radius: 14px;
-    padding: 8px 12px;
-    font-size: 12px;
-    line-height: 1.5;
-    box-shadow: 0 2px 8px var(--shadow);
-  }
-  .cash-badge { cursor: pointer; transition: padding .15s ease; }
-  .cash-badge .cb-title { font-weight: 700; font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
-  .cash-badge .cb-caret { margin-left: auto; padding-left: 8px; font-size: 10px; color: var(--ink-soft); transition: transform .15s ease; }
-  .cash-badge .cb-body { margin-top: 3px; }
-  .cash-badge.collapsed { padding: 6px 12px; }
-  .cash-badge.collapsed .cb-body { display: none; }
-  .cash-badge.collapsed .cb-caret { transform: rotate(-90deg); }
-  .cash-badge.ok    { border-left: 4px solid #6fae6a; }
-  .cash-badge.short { border-left: 4px solid #d98a5a; }
-  .cash-badge .amt-y { color: var(--accent-dk); font-weight: 700; }
-  .cash-badge .amt-s { color: #c2703a; font-weight: 700; }
-
   .needs .needs-lead { margin: 0 0 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
   .sum-chip { margin-left: auto; font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 9px; white-space: nowrap; }
   .sum-chip.ok    { background: #e7f3e2; color: #4f8a52; }
@@ -349,7 +323,6 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
-      <div class="cash-badge" id="cashBadge"></div>
       <div class="tree-hint">木の各パーツをタップすると、やさしい解説が出ます 🍃</div>
     </div>
 
@@ -1196,29 +1169,6 @@ function renderNeeds(nd) {
     verdict;
 }
 
-let cashBadgeCollapsed = true;    // 既定は小さく折りたたみ、タップで展開
-
-function renderCashBadge(nd) {
-  const cash = state.cash;
-  const cov = nd.necessary > 0 ? cash / nd.necessary : 1;
-  const el = $("cashBadge");
-  const caret = `<span class="cb-caret">▾</span>`;
-  if (cov >= 1) {
-    el.className = "cash-badge ok";
-    el.innerHTML = `<div class="cb-title">🌱 投資にまわせる余力 <span class="amt-y">${manen(Math.max(0, cash - nd.necessary))}</span>${caret}</div>`
-      + `<div class="cb-body">土台（生活防衛＋目先の出費）はクリア。余力で木を育てられます。</div>`;
-  } else {
-    el.className = "cash-badge short";
-    el.innerHTML = `<div class="cb-title">⚠️ 土台の現金が <span class="amt-s">${manen(nd.necessary - cash)}</span> 不足${caret}</div>`
-      + `<div class="cb-body">まず生活防衛資金を確保すると、根が安定します。</div>`;
-  }
-  el.classList.toggle("collapsed", cashBadgeCollapsed);
-  el.onclick = () => {
-    cashBadgeCollapsed = !cashBadgeCollapsed;
-    el.classList.toggle("collapsed", cashBadgeCollapsed);
-  };
-}
-
 function renderAll() {
   let t;
   if (payMethod === "sell") {
@@ -1254,7 +1204,6 @@ function renderAll() {
   renderBalance(t);
   renderHoldings(t);
   renderNeeds(nd);
-  renderCashBadge(nd);
   renderHealth();
   renderMethod();
   renderProj(t);
