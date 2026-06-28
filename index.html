@@ -710,7 +710,7 @@ function buildTree(t) {
     // 支え枝はコンパクトに（短め）。葉の総面積は emitLeaves が投資額に合わせる。
     const reach = t.H * 0.15 * (0.7 + 0.5 * bdShare);
     const bdDepth = Math.max(2, depth - 1);
-    const by1 = baseY - t.H * 0.26, bx1 = trunkXat(by1);   // 樹冠の下から左右へ
+    const by1 = baseY - t.H * 0.31, bx1 = trunkXat(by1);   // 樹冠寄り（少し上）から左右へ
     grow(bx1, by1, trunkAng + 0.82, reach, bw, bdDepth, bdBucket);  // 左へ
     grow(bx1, by1, trunkAng - 0.82, reach, bw, bdDepth, bdBucket);  // 右へ
   }
