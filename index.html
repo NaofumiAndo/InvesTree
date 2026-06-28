@@ -203,8 +203,6 @@
   .bubble .bd-amt { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); white-space: nowrap; }
   /* 商品が増えても枠内でスクロール */
   .bubble .bd-list { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; }
-  .bubble .bd-note { margin-top: 6px; padding-top: 5px; border-top: 1px solid #ecdfc8;
-    font-size: 11.5px; color: var(--ink-soft); line-height: 1.45; }
 
   /* side panel */
   .panel {
@@ -980,16 +978,8 @@ function breakdownHTML(part, t) {
   switch (part) {
     case "equity":
       return head("🌳 株式", state.equity, "#4f8a52") + scroll(rowsFor("equity", "株式", state.equity));
-    case "bond": {
-      // 全体の安全度（リスク×集中度から算出した支え枝の頼もしさ）
-      let note = "";
-      if (state.bond > 0 && t.bondQuality != null) {
-        const q = t.bondQuality;
-        const qlab = q >= 0.8 ? "頼もしい（太い支え枝）" : q >= 0.5 ? "まずまず" : "頼りない（細く垂れる）";
-        note = `<div class="bd-note">支えの安全度：${qlab}<br>国債か分散投信のどちらかで太く安定します。</div>`;
-      }
-      return head("🌿 債券", state.bond, "#a9803b") + scroll(rowsFor("bond", "債券", state.bond)) + note;
-    }
+    case "bond":
+      return head("🌿 債券", state.bond, "#a9803b") + scroll(rowsFor("bond", "債券", state.bond));
     case "other":
       return head("🪴 その他資産", state.other, "#c2703a") + scroll(rowsFor("other", "その他", state.other));
     case "fruit": {
@@ -1167,15 +1157,22 @@ function attachTreeInteractions(t) {
       const html = breakdownHTML(part, t);
       if (!html) return;
       bubble.innerHTML = html;
-      // バブルを表示位置へ
+      bubble.classList.add("show");          // 先に表示してから実寸を測る
       const rect = stage.getBoundingClientRect();
+      // ステージは overflow:hidden。バブル全体が枠内に収まるよう、はみ出す分は
+      // 商品リスト(.bd-list)の高さを詰めてスクロールに委ねる。
+      const list = bubble.querySelector(".bd-list");
+      if (list) list.style.maxHeight = "";   // 計測前にリセット
+      const avail = rect.height - 16;
+      if (bubble.offsetHeight > avail && list) {
+        const over = bubble.offsetHeight - avail;
+        list.style.maxHeight = Math.max(56, list.clientHeight - over) + "px";
+      }
+      const bw = bubble.offsetWidth, bh = bubble.offsetHeight;
       const px = (e.clientX - rect.left);
       const py = (e.clientY - rect.top);
-      let bx = clamp(px + 12, 8, rect.width - 232);
-      let by = clamp(py - 10, 8, rect.height - 120);
-      bubble.style.left = bx + "px";
-      bubble.style.top = by + "px";
-      bubble.classList.add("show");
+      bubble.style.left = clamp(px + 12, 8, rect.width - bw - 8) + "px";
+      bubble.style.top  = clamp(py - 10, 8, rect.height - bh - 8) + "px";
     });
   });
   svg.addEventListener("click", (e) => {
