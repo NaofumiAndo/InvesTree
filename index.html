@@ -347,7 +347,7 @@
       </details>
 
       <details class="box needs">
-        <summary>🍃 これからの積立で年代に合わせる</summary>
+        <summary>③ 🍃 これからの積立 <span id="projChip" class="sum-chip"></span></summary>
         <p class="needs-lead">売って減らすのではなく、これからの積立の振り分けで整えます。木は切らずに形が変わります。</p>
         <label>毎月の積立額 <span class="v" id="vContrib"></span></label>
         <input type="range" id="iContrib" min="0" max="30" step="1" value="5">
@@ -359,7 +359,7 @@
       </details>
 
       <details class="box needs">
-        <summary>💰 まとまったお金が急に必要になったら？</summary>
+        <summary>④ 💰 まとまったお金が急に必要になったら？</summary>
         <p class="needs-lead">急な出費のとき、投資をどう扱う？ 選んだ方法で木の運命が変わります。</p>
         <label>必要な金額 <span class="v" id="vNeedCash"></span></label>
         <input type="range" id="iNeedCash" min="0" max="500" step="10" value="100">
@@ -1237,26 +1237,59 @@ function renderHealth() {
   const eqPct = Math.round(state.equity / sb * 100);
   const gap = eqPct - target;
   let cls, txt, note;
-  if (gap > 25)       { cls = "bad";  txt = "株が過剰";   note = "年代に対して株が多すぎます。これからの積立を債券へ多めに振り、売らずに整えましょう。"; }
-  else if (gap > 10)  { cls = "warn"; txt = "やや株多め"; note = "少し株寄り。積立の振り分けを債券に寄せると年代に合っていきます。"; }
+  if (gap > 25)       { cls = "bad";  txt = "株が過剰";   note = "年齢に対して株が多すぎます。これからの積立を債券へ多めに振り、売らずに整えましょう。"; }
+  else if (gap > 10)  { cls = "warn"; txt = "やや株多め"; note = "少し株寄り。積立の振り分けを債券に寄せると年齢に合っていきます。"; }
   else if (gap < -15) { cls = "warn"; txt = "守りすぎ";   note = "やや保守的。退職までまだ距離があるなら、もう少し株を増やす余地があります。"; }
-  else                { cls = "ok";   txt = "年代に合う"; note = "年齢と退職想定に対してバランス良好です。"; }
+  else                { cls = "ok";   txt = "年齢に合う"; note = "年齢と退職想定に対してバランス良好です。"; }
   chip.className = "sum-chip " + cls; chip.textContent = (cls === "ok" ? "🍃 " : cls === "bad" ? "🌪️ " : "🌬️ ") + txt;
   detail.innerHTML =
     `<div class="needs-row"><span class="lab">退職まで</span><span class="num">${ytr}年（${retireAge}歳想定）</span></div>` +
-    `<div class="needs-row"><span class="lab">年代のおすすめ 株:債</span><span class="num">${Math.round(target)}% : ${100 - Math.round(target)}%</span></div>` +
+    `<div class="needs-row"><span class="lab">年齢のおすすめ 株:債</span><span class="num">${Math.round(target)}% : ${100 - Math.round(target)}%</span></div>` +
     `<div class="needs-row"><span class="lab">いまの 株:債</span><span class="num">${eqPct}% : ${100 - eqPct}%</span></div>` +
     `<div class="needs-verdict ${cls === "ok" ? "ok" : "short"}">${chip.textContent}</div>` +
     `<div class="needs-note">${note}</div>`;
 }
 
-// これからの積立で年代に合わせる（売らずにリバランス）＋ 年代のおすすめ配分
+// ③ これからの積立（契約）の健康度チップ：年齢に合わせる方向になっているか
+function renderProjChip() {
+  const chip = $("projChip");
+  const target = targetEquityPct(state.age);
+  const contribEqPct = (1 - bondAlloc) * 100;   // 新しい積立の株%
+  const sb = state.equity + state.bond;
+  let cls, txt;
+  if (contribMonthly <= 0) {
+    cls = "warn"; txt = "積立なし";
+  } else if (sb <= 0) {
+    // まだ保有なし。積立が年齢に沿って始まっているか
+    cls = Math.abs(contribEqPct - target) <= 15 ? "ok" : "warn";
+    txt = cls === "ok" ? "年齢に合う" : "要見直し";
+  } else {
+    const eqPct = state.equity / sb * 100;
+    const gapNow = eqPct - target;            // ②のズレ
+    if (Math.abs(gapNow) <= 10) {
+      // ②が年齢に合っている → 積立も年齢どおりなら維持
+      cls = Math.abs(contribEqPct - target) <= 18 ? "ok" : "warn";
+      txt = cls === "ok" ? "年齢に合う" : "要調整";
+    } else {
+      // ②がずれている → 積立がズレを縮める方向か
+      const movingToward = Math.sign(contribEqPct - eqPct) === Math.sign(target - eqPct) && Math.abs(contribEqPct - eqPct) > 3;
+      cls = movingToward ? "ok" : "bad";
+      txt = movingToward ? "合わせ中" : "要見直し";
+    }
+  }
+  chip.className = "sum-chip " + cls;
+  chip.textContent = (cls === "ok" ? "🍃 " : cls === "bad" ? "⚠️ " : "🌬️ ") + txt;
+}
+
+// これからの積立で年齢に合わせる（売らずにリバランス）＋ 年齢のおすすめ配分
 function renderProj(t) {
+  renderProjChip();
   const el = $("projResult");
   const targetNow = targetEquityPct(state.age);
   if (projYears <= 0) {
     el.innerHTML =
-      `<div class="needs-row"><span class="lab">いまの年代のおすすめ（${state.age}歳）</span><span class="num">株${Math.round(targetNow)}% : 債${100-Math.round(targetNow)}%</span></div>` +
+      `<div class="needs-row"><span class="lab">いまの年齢のおすすめ（${state.age}歳）</span><span class="num">株${Math.round(targetNow)}% : 債${100-Math.round(targetNow)}%</span></div>` +
+      `<div class="needs-row"><span class="lab">これからの積立</span><span class="num">株${100-Math.round(bondAlloc*100)}% : 債${Math.round(bondAlloc*100)}%</span></div>` +
       `<div class="needs-note">「何年後を見る」を動かすと、これからの積立だけで木の形がどう整うかを投影します（売却なし）。年齢とともに債券へ多めにまわすと、おすすめ配分に沿って風が穏やかに。</div>`;
     return;
   }
@@ -1267,7 +1300,7 @@ function renderProj(t) {
   el.innerHTML =
     `<div class="needs-verdict ok">🍃 売らずに整える（${projYears}年後・${futAge}歳）</div>` +
     `<div class="needs-row"><span class="lab">${projYears}年後の保有 株:債</span><span class="num">${eqPct}% : ${100-eqPct}%</span></div>` +
-    `<div class="needs-row"><span class="lab">その年代のおすすめ</span><span class="num">株${Math.round(futTarget)}% : 債${100-Math.round(futTarget)}%</span></div>` +
+    `<div class="needs-row"><span class="lab">その年齢のおすすめ</span><span class="num">株${Math.round(futTarget)}% : 債${100-Math.round(futTarget)}%</span></div>` +
     `<div class="needs-row"><span class="lab">木の風</span><span class="num" style="color:${w.color}">${w.txt}</span></div>` +
     `<div class="needs-note">売却ゼロ。これからの積立を債券に${Math.round(bondAlloc*100)}%まわした場合。おすすめ比率に近づくほど風が穏やかになります。</div>`;
 }
