@@ -369,12 +369,49 @@
     padding: 11px 26px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
   }
   .reflect-btn:hover { filter: brightness(1.05); }
+  /* アカウント表示（ヘッダー右） */
+  .app { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .acct { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--ink-soft); }
+  .acct-name { display: inline-flex; align-items: center; gap: 5px; }
+  .link-btn { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--accent-dk); text-decoration: underline; cursor: pointer; }
+  /* ログイン画面 */
+  .login-overlay { background: linear-gradient(180deg, #eaf5ee 0%, #f3ead7 100%); }
+  .login-card { max-width: 360px; text-align: center; padding: 28px 24px 20px; }
+  .login-logo { font-size: 44px; line-height: 1; }
+  .login-card h3 { margin: 8px 0 6px; font-size: 18px; }
+  .login-card > p { margin: 0 0 16px; font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
+  .gbtn {
+    display: inline-flex; align-items: center; gap: 10px; margin: 0 auto;
+    padding: 11px 22px; border: 1.5px solid #dadce0; border-radius: 24px;
+    background: #fff; color: #3c4043; font: inherit; font-weight: 600; font-size: 14px;
+    cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.12);
+  }
+  .gbtn:hover { background: #f8f9fa; box-shadow: 0 1px 5px rgba(0,0,0,.18); }
+  .login-note { margin: 16px 0 0; font-size: 10.5px; color: var(--ink-soft); opacity: 0.8; line-height: 1.5; }
+  /* オンボーディング：ペルソナ選択 */
+  .onboard-card { max-width: 520px; }
+  .persona-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .persona-card {
+    display: flex; flex-direction: column; gap: 3px; align-items: flex-start; text-align: left;
+    padding: 12px; border: 2px solid #ead9bd; border-radius: 14px; background: #fffdf8;
+    cursor: pointer; font: inherit; transition: border-color .12s, background .12s, transform .08s;
+  }
+  .persona-card:hover { border-color: var(--accent); background: #fbf6ec; }
+  .persona-card:active { transform: scale(0.98); }
+  .pc-emoji { font-size: 22px; line-height: 1; }
+  .pc-label { font-weight: 700; font-size: 13px; color: var(--ink); }
+  .pc-note { font-size: 11px; color: var(--ink-soft); line-height: 1.4; }
+  @media (max-width: 480px) { .persona-grid { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <div class="wrap">
   <header class="app">
     <h1>🌳 おかねの木</h1>
+    <div class="acct" id="acct" hidden>
+      <span class="acct-name" id="acctName"></span>
+      <button type="button" class="link-btn" id="rechoose">ペルソナを選び直す</button>
+    </div>
   </header>
 
   <div class="layout">
@@ -468,6 +505,29 @@
       <input type="range" id="sCash" min="0" max="100" step="1">
       <button class="reset-btn" id="resetBtn">↺ 選んだ人の初期状態に戻す</button>
     </details>
+  </div>
+</div>
+
+<!-- ログイン（プロトタイプ：Google風サインイン） -->
+<div class="modal-overlay login-overlay" id="loginOverlay" hidden>
+  <div class="modal login-card">
+    <div class="login-logo">🌳</div>
+    <h3>おかねの木へようこそ</h3>
+    <p>あなたの資産を一本の木として育てましょう。<br>まずはログインして始めます。</p>
+    <button type="button" class="gbtn" id="googleLogin">
+      <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.46 3.44 1.35l2.58-2.58A8.99 8.99 0 0 0 9 0 9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>
+      Google でログイン
+    </button>
+    <p class="login-note">※プロトタイプのためログインは簡易的に再現しています。実運用では Google アカウント連携に置き換えます。</p>
+  </div>
+</div>
+
+<!-- 初回オンボーディング：近いペルソナを選んで開始 -->
+<div class="modal-overlay" id="onboarding" hidden>
+  <div class="modal onboard-card">
+    <h3>近い状態を選んでスタート</h3>
+    <p>あなたに一番近いタイプを選ぶと、その資産構成で木が育ち始めます。保有商品や金額は<b>あとから調整できます</b>。<span class="muted">いずれは口座連携で自動反映できるようにします。</span></p>
+    <div class="persona-grid" id="personaGrid"></div>
   </div>
 </div>
 
@@ -600,6 +660,63 @@ const PROFILES = [
       { name: "eMAXIS Slim 全世界株式（オルカン）", assetClass: "equity", amount: 1000000, distinctSecurities: 3000 },
     ],
     cash: 500000,
+  },
+  {
+    id: "newbie",
+    emoji: "🐣",
+    label: "新社会人・これから",
+    name: "ゆうと（23歳）",
+    note: "まずは現金、投資はこれから",
+    age: 23,
+    start: "2025-10-01",
+    holdings: [
+      { name: "eMAXIS Slim 全世界株式（オルカン）", assetClass: "equity", amount: 100000, distinctSecurities: 3000 },
+    ],
+    cash: 600000,
+  },
+  {
+    id: "saver",
+    emoji: "📈",
+    label: "30代・コツコツ積立",
+    name: "あおい（34歳）",
+    note: "NISAでインデックス中心",
+    age: 34,
+    start: "2020-01-01",
+    holdings: [
+      { name: "eMAXIS Slim 全世界株式（オルカン）", assetClass: "equity", amount: 1500000, distinctSecurities: 3000 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 300000, distinctSecurities: 1000, riskTier: "low" },
+    ],
+    cash: 800000,
+  },
+  {
+    id: "family",
+    emoji: "👨‍👩‍👧",
+    label: "共働き・教育費世代",
+    name: "けんと＆みな（42歳）",
+    note: "教育費にそなえ現金多め",
+    age: 42,
+    start: "2014-04-01",
+    holdings: [
+      { name: "全世界株式インデックス", assetClass: "equity", amount: 2500000, distinctSecurities: 3000 },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 1000000, distinctSecurities: 1000, riskTier: "low" },
+      { name: "J-REIT", assetClass: "other", amount: 300000, distinctSecurities: 50 },
+    ],
+    cash: 2000000,
+  },
+  {
+    id: "retiree",
+    emoji: "🍵",
+    label: "退職後・取り崩し世代",
+    name: "よし子（70歳）",
+    note: "債券と配当株で安定運用",
+    age: 70,
+    start: "1988-04-01",
+    holdings: [
+      { name: "国内債券インデックス", assetClass: "bond", amount: 3000000, distinctSecurities: 300, riskTier: "low" },
+      { name: "先進国債券インデックス", assetClass: "bond", amount: 2000000, distinctSecurities: 1000, riskTier: "low" },
+      { name: "高配当株（複数銘柄）", assetClass: "equity", amount: 1500000, distinctSecurities: 30 },
+    ],
+    cash: 2500000,
   },
 ];
 
@@ -1642,9 +1759,52 @@ $("iEquityAlloc").addEventListener("input", (e) => { equityAlloc = (+e.target.va
 $("iProjYears").addEventListener("input", (e) => { projYears = +e.target.value; renderAll(); });
 $("resetBtn").addEventListener("click", () => selectProfile(activeId));
 
+// ===== ログイン＆オンボーディング（プロトタイプ）=====
+// 注：実運用の Google ログインは OAuth クライアントID＋認可済みオリジンが必要。
+//     ここでは localStorage で状態を保持する簡易再現。GIS への差し替え口として分離。
+const LS = { logged: "okane_loggedIn", persona: "okane_persona" };
+const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+function buildPersonaGrid() {
+  $("personaGrid").innerHTML = PROFILES.map(p =>
+    `<button type="button" class="persona-card" data-id="${p.id}">` +
+    `<span class="pc-emoji">${p.emoji}</span>` +
+    `<span class="pc-label">${p.label}</span>` +
+    `<span class="pc-note">${p.age}歳・${p.note}</span></button>`
+  ).join("");
+  $("personaGrid").querySelectorAll(".persona-card").forEach(b =>
+    b.addEventListener("click", () => choosePersona(b.dataset.id)));
+}
+function markLoggedIn() { $("acctName").textContent = "✓ ログイン中（デモ）"; $("acct").hidden = false; }
+function showOnboarding() { buildPersonaGrid(); $("onboarding").hidden = false; }
+function doLogin() {
+  lsSet(LS.logged, "1");
+  $("loginOverlay").hidden = true;
+  markLoggedIn();
+  if (!lsGet(LS.persona)) showOnboarding();
+}
+function choosePersona(id) {
+  lsSet(LS.persona, id);
+  $("onboarding").hidden = true;
+  selectProfile(id);
+}
+$("googleLogin").addEventListener("click", doLogin);
+$("rechoose").addEventListener("click", showOnboarding);
+
+function bootAuth() {
+  const logged = lsGet(LS.logged) === "1";
+  const persona = lsGet(LS.persona);
+  if (!logged) { $("loginOverlay").hidden = false; return; }
+  markLoggedIn();
+  if (persona && PROFILES.some(p => p.id === persona)) selectProfile(persona);
+  else showOnboarding();
+}
+
 // 起動
 syncSliders();
 renderAll();
+bootAuth();
 </script>
 
 <style>
