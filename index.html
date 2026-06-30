@@ -458,6 +458,14 @@
     display: flex; gap: 6px; z-index: 5; pointer-events: none; }
   .car-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(120,100,70,0.3); }
   .car-dots span.on { background: var(--accent-dk); }
+  /* 比較対象セレクタ（理想／平均／閉じる） */
+  .cmp-select { position: absolute; top: 10px; right: 10px; z-index: 6; display: flex;
+    background: rgba(255,253,248,0.94); border: 1.5px solid #e3d4b6; border-radius: 13px;
+    overflow: hidden; box-shadow: 0 3px 10px rgba(0,0,0,0.14); }
+  .cmp-select button { border: none; background: none; font: inherit; font-size: 11px; font-weight: 700;
+    color: var(--ink-soft); padding: 5px 11px; cursor: pointer; line-height: 1.2; }
+  .cmp-select button + button { border-left: 1px solid #ead9bd; }
+  .cmp-select button.on { background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
@@ -476,6 +484,12 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
+      <!-- 比較対象セレクタ（理想／同年代の平均／閉じる） -->
+      <div class="cmp-select" id="cmpSelect">
+        <button type="button" data-mode="ideal">理想</button>
+        <button type="button" data-mode="average">平均</button>
+        <button type="button" data-mode="none">✕</button>
+      </div>
     </div>
 
     <div class="panel">
@@ -1314,14 +1328,14 @@ function buildTree(t) {
 
 // スワイプ/矢印で切り替えるカルーセル：各木を画面いっぱいの大きさで表示。
 // スライド1＝いまの木（操作可）、スライド2＝理想の木（年齢の目安）。
-function buildCarousel(tNow, tIdeal) {
+function buildCarousel(tNow, tCmp, cmpLabel, cmpShort) {
   const slide = (svg, cap) => `<div class="tree-slide">${svg}<div class="slide-cap">${cap}</div></div>`;
   let slides = slide(buildTree(tNow), "いまの木");
   let controls = "";
-  if (tIdeal) {
-    slides += slide(buildTree(tIdeal), "理想の木（年齢の目安）");
+  if (tCmp) {
+    slides += slide(buildTree(tCmp), cmpLabel);
     controls =
-      `<button type="button" class="car-arrow car-next" id="carNext" aria-label="理想の木を見る">理想<br>→</button>` +
+      `<button type="button" class="car-arrow car-next" id="carNext" aria-label="${cmpShort}の木を見る">${cmpShort}<br>→</button>` +
       `<button type="button" class="car-arrow car-prev" id="carPrev" aria-label="いまの木に戻る" hidden>←<br>いま</button>` +
       `<div class="car-dots" id="carDots"><span></span><span></span></div>`;
   }
@@ -1330,9 +1344,9 @@ function buildCarousel(tNow, tIdeal) {
 
 // PC（横幅に余裕がある）向け：同じ地面に「いまの木」「理想の木」を並べて1画面表示。
 // viewBox 幅が2倍になるぶん高さは低くなり、縦に切れずに収まる。
-function buildComparison(tNow, tIdeal) {
+function buildComparison(tNow, tCmp, cmpLabel) {
   const A = buildTreeParts(tNow);
-  const B = buildTreeParts(tIdeal, { noLabels: true });
+  const B = buildTreeParts(tCmp, { noLabels: true });
   const cap = (x, txt) => {
     const s = `text-anchor="middle" font-weight="700" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.8" stroke-linejoin="round" style="font-family:inherit" pointer-events="none"`;
     return `<text x="${x}" y="${VH - 12}" ${s} font-size="14.5" fill="#6f5a3a">${txt}</text>`;
@@ -1340,7 +1354,7 @@ function buildComparison(tNow, tIdeal) {
   const body =
     `<g>${A.inner}</g>` +
     `<g transform="translate(${VW},0)" style="pointer-events:none">${B.inner}</g>` +
-    cap(CX, "いまの木") + cap(CX + VW, "理想の木（年齢の目安）");
+    cap(CX, "いまの木") + cap(CX + VW, cmpLabel);
   return treeScene(VW * 2, A.gust, body);
 }
 
@@ -1685,13 +1699,14 @@ function renderAll() {
   t.cashCoverage = nd.necessary > 0 ? state.cash / nd.necessary : 1;
   t.excessCash = Math.max(0, state.cash - nd.necessary);
 
-  const it = idealTreeParam(nd);
-  if (wideMode() && it) {
-    $("treeHost").innerHTML = buildComparison(t, it);   // PC：横並びで1画面に収める
+  const cmp = comparisonTarget(nd);
+  if (wideMode() && cmp.t) {
+    $("treeHost").innerHTML = buildComparison(t, cmp.t, cmp.label);   // PC：横並びで1画面に収める
   } else {
-    $("treeHost").innerHTML = buildCarousel(t, it);      // モバイル：全幅＋スワイプ
+    $("treeHost").innerHTML = buildCarousel(t, cmp.t, cmp.label, cmp.short);  // モバイル：全幅＋スワイプ
     initCarousel();
   }
+  updateCmpUI();
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
@@ -1948,6 +1963,20 @@ window.addEventListener("resize", () => {
   clearTimeout(rzTmr);
   rzTmr = setTimeout(() => { if (wideMode() !== lastWide) { lastWide = wideMode(); renderAll(); } }, 150);
 });
+
+// 比較対象モード（ideal=理想 / average=同年代の平均 / none=閉じる）。状態を保持。
+let compareMode = "ideal";
+function updateCmpUI() {
+  document.querySelectorAll("#cmpSelect button").forEach(btn =>
+    btn.classList.toggle("on", btn.dataset.mode === compareMode));
+}
+document.querySelectorAll("#cmpSelect button").forEach(btn =>
+  btn.addEventListener("click", () => {
+    compareMode = btn.dataset.mode;
+    carIndex = 0;                       // モード切替時はいまの木から
+    lsSet("okane_compareMode", compareMode);
+    renderAll();                        // updateCmpUI は renderAll 内で呼ばれる
+  }));
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
@@ -2031,6 +2060,35 @@ function idealTreeParam(nd) {
   return it;
 }
 
+// ===== 同年代の人の「平均的な木」（代表的な目安・概算）=====
+// 年齢から、よくある資産額・配分・積立年数をざっくり再現。理想ではなく“平均像”。
+function averageTreeParam(nd) {
+  const age = state.age;
+  const invested = clamp(age - 22, 1, 45) * 250000;            // 年代別のざっくり平均資産（目安）
+  const eqPct = clamp(0.65 - (age - 35) * 0.008, 0.30, 0.70);  // 年代が上ほど株は控えめ
+  const peerYears = clamp(age - 25, 1, 20) * 0.7;              // 平均的な積立年数（目安）
+  const need = (nd || computeNeeds()).necessary;
+  const rest = invested * (1 - eqPct);
+  const is = {
+    age, years: peerYears,
+    divScore: 2.0, bondDivScore: 2.0, bondRisk: 0.5,   // ほどほどの分散・中リスク
+    equity: invested * eqPct,
+    bond: rest * 0.7,
+    other: rest * 0.3,                                  // REIT・暗号資産などが少し
+    cash: need,
+  };
+  const it = deriveTree(is);
+  it.cash = need; it.necessaryCash = need; it.cashCoverage = 1; it.excessCash = 0;
+  return it;
+}
+
+// 現在の比較モードに応じた比較対象の木とラベル
+function comparisonTarget(nd) {
+  if (compareMode === "average") return { t: averageTreeParam(nd), label: "平均の木（同年代の目安）", short: "平均" };
+  if (compareMode === "ideal")   return { t: idealTreeParam(nd),   label: "理想の木（年齢の目安）", short: "理想" };
+  return { t: null, label: "", short: "" };
+}
+
 // ===== ③ 積立配分スライダーに「年齢のおすすめ」目安を表示し、次の一手を案内 =====
 function renderAllocGuide() {
   const target = Math.round(targetEquityPct(state.age));   // 年齢に合う株%
@@ -2049,6 +2107,8 @@ function renderAllocGuide() {
 
 // 起動
 syncSliders();
+const savedCmp = lsGet("okane_compareMode");
+if (savedCmp) compareMode = savedCmp;
 renderAll();
 bootAuth();
 </script>
