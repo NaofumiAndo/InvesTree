@@ -431,20 +431,12 @@
   .alloc-hint { margin-top: 18px; font-size: 11.5px; line-height: 1.5; }
   .alloc-hint .ah-ok { color: #4f8a52; font-weight: 700; }
   .alloc-hint .ah-move { color: #c2872f; }
-  /* 理想の木（目安）インセット */
-  .ideal-inset { position: absolute; top: 10px; right: 10px; width: 34%; max-width: 168px; z-index: 4;
-    background: rgba(255,253,248,0.82); border: 1.5px solid #e3d4b6; border-radius: 14px; padding: 4px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
-  .ideal-inset[hidden] { display: none; }
-  .ideal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
-    font-size: 10px; font-weight: 700; color: var(--ink-soft); padding: 2px 2px 1px 6px; line-height: 1.25; }
-  .ideal-sub { font-weight: 400; font-size: 9px; opacity: 0.85; }
-  .ideal-x { background: none; border: none; font-size: 16px; line-height: 1; color: var(--ink-soft); cursor: pointer; padding: 0 2px; }
-  .ideal-inset svg.tree { display: block; width: 100%; height: auto; border-radius: 10px; }
-  .ideal-show { position: absolute; top: 10px; right: 10px; z-index: 4; background: rgba(255,253,248,0.92);
-    border: 1.5px solid #e3d4b6; border-radius: 20px; padding: 5px 11px; font: inherit; font-size: 11px;
-    font-weight: 700; color: var(--accent-dk); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
-  .ideal-show[hidden] { display: none; }
+  /* 理想の木 比較トグル */
+  .ideal-toggle { position: absolute; top: 10px; right: 10px; z-index: 4;
+    background: rgba(255,253,248,0.92); border: 1.5px solid #e3d4b6; border-radius: 20px;
+    padding: 5px 12px; font: inherit; font-size: 11px; font-weight: 700; color: var(--accent-dk);
+    cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .ideal-toggle:hover { background: #fff; }
 </style>
 </head>
 <body>
@@ -462,12 +454,8 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
-      <!-- 理想の木（年齢の目安）。デフォルト表示・ワンクリックでしまえる -->
-      <div class="ideal-inset" id="idealInset">
-        <div class="ideal-head"><span>🌳 理想の木<br><span class="ideal-sub">あなたの年齢の目安</span></span><button type="button" class="ideal-x" id="idealClose" aria-label="閉じる">×</button></div>
-        <div id="idealHost"></div>
-      </div>
-      <button type="button" class="ideal-show" id="idealShow" hidden>🌳 理想の木を見る</button>
+      <!-- 等身大で「いまの木／理想の木」を横並び比較するトグル（既定ON） -->
+      <button type="button" class="ideal-toggle" id="idealToggle"></button>
     </div>
 
     <div class="panel">
@@ -972,7 +960,7 @@ function leafCluster(cx, cy, r, hue) {
 }
 
 
-function buildTree(t) {
+function buildTreeParts(t, opts = {}) {
   const wind = t.wind;
   const windLean = wind * 64;          // 風による静的な傾き（先端変位 px）
   const swayAmp = (0.5 + wind * 4.2).toFixed(2); // 揺れ角度
@@ -1245,17 +1233,27 @@ function buildTree(t) {
     }
   }
 
-  const svg = `
-  <svg class="tree" viewBox="0 0 ${VW} ${VH}" xmlns="http://www.w3.org/2000/svg" style="--amp:${swayAmp}deg; --dur:${swayDur}s;">
-    <defs>
+  // 木そのもの（根・影・切り株・揺れる幹葉・鉢・ラベル）。CX/GROUND 基準で構築。
+  // シーン（空・地面）から分離し、translate で並べれば等身大で横に比較できる。
+  const inner =
+    `<g class="hit" data-part="roots">${roots}</g>`
+    + `<ellipse cx="${CX+10}" cy="${GROUND+10}" rx="${90 + t.H*0.1}" ry="14" fill="rgba(90,70,40,0.16)"/>`
+    + stumpSVG
+    + `<g class="sway" style="--amp:${swayAmp}deg; --dur:${swayDur}s; transform-origin:${CX}px ${baseY}px;">${trunkSVG}${leavesSVG}${fruitsSVG}</g>`
+    + `<g class="hit" data-part="other">${pots}</g>`
+    + (opts.noLabels ? "" : labels);
+  return { inner, gust };
+}
+
+// グラデーション定義（幅に依存しないので両モードで共有）
+function treeDefs() {
+  return `
       <linearGradient id="barkE" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
         <stop offset="0" stop-color="#8c6238"/><stop offset="0.5" stop-color="#a87a4a"/><stop offset="1" stop-color="#c0986090"/>
       </linearGradient>
-      <!-- 株の枝：ほんのり緑みのある茶 -->
       <linearGradient id="barkEq" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
         <stop offset="0" stop-color="#806a34"/><stop offset="0.5" stop-color="#9c8848"/><stop offset="1" stop-color="#b29a5e90"/>
       </linearGradient>
-      <!-- 債券の枝：ほんのり暖かみのある茶 -->
       <linearGradient id="barkBd" gradientUnits="userSpaceOnUse" x1="0" y1="${GROUND}" x2="0" y2="${GROUND - 380}">
         <stop offset="0" stop-color="#9c7240"/><stop offset="0.5" stop-color="#bd9056"/><stop offset="1" stop-color="#d4ad6e90"/>
       </linearGradient>
@@ -1265,50 +1263,50 @@ function buildTree(t) {
       <linearGradient id="barkBond" x1="0" y1="1" x2="0" y2="0">
         <stop offset="0" stop-color="#a9854f"/><stop offset="1" stop-color="#c6a36a"/>
       </linearGradient>
-      <!-- 二股用：左(株)→右(債券) を横方向になめらかに変化させ継ぎ目を消す -->
       <linearGradient id="barkFork" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0"    stop-color="#8f6238"/>
-        <stop offset="0.42" stop-color="#a9794a"/>
-        <stop offset="0.58" stop-color="#b58a55"/>
-        <stop offset="1"    stop-color="#c8a76c"/>
+        <stop offset="0" stop-color="#8f6238"/><stop offset="0.42" stop-color="#a9794a"/>
+        <stop offset="0.58" stop-color="#b58a55"/><stop offset="1" stop-color="#c8a76c"/>
       </linearGradient>
       <radialGradient id="sun" cx="0.82" cy="0.16" r="0.3">
         <stop offset="0" stop-color="#fff6da"/><stop offset="1" stop-color="#fff6da" stop-opacity="0"/>
-      </radialGradient>
-    </defs>
+      </radialGradient>`;
+}
 
-    <rect x="0" y="0" width="${VW}" height="${VH}" fill="url(#sun)"/>
-    <circle cx="394" cy="74" r="34" fill="#ffe9a8" opacity="0.85"/>
-
+// 空・太陽・地面のシーンに、木（body）を流し込む
+function treeScene(width, gust, body) {
+  return `
+  <svg class="tree" viewBox="0 0 ${width} ${VH}" xmlns="http://www.w3.org/2000/svg">
+    <defs>${treeDefs()}</defs>
+    <rect x="0" y="0" width="${width}" height="${VH}" fill="url(#sun)"/>
+    <circle cx="${width - 86}" cy="74" r="34" fill="#ffe9a8" opacity="0.85"/>
     ${gust}
-
-    <!-- 地面 -->
-    <path d="M 0 ${GROUND} Q ${CX} ${GROUND-26} ${VW} ${GROUND} L ${VW} ${VH} L 0 ${VH} Z" fill="var(--ground)"/>
-    <path d="M 0 ${GROUND} Q ${CX} ${GROUND-26} ${VW} ${GROUND}" stroke="var(--ground-dk)" stroke-width="3" fill="none" opacity="0.5"/>
-
-    <!-- 根 -->
-    <g class="hit" data-part="roots">${roots}</g>
-
-    <!-- 木の影 -->
-    <ellipse cx="${CX+10}" cy="${GROUND+10}" rx="${90 + t.H*0.1}" ry="14" fill="rgba(90,70,40,0.16)"/>
-
-    <!-- 切り株（売却モードのみ・揺れない） -->
-    ${stumpSVG}
-
-    <!-- 揺れるグループ（幹＋葉）。売却時は切り口を支点に揺れる -->
-    <g class="sway" style="transform-origin:${CX}px ${baseY}px;">
-      ${trunkSVG}
-      ${leavesSVG}
-      ${fruitsSVG}
-    </g>
-
-    <!-- その他資産＝足元の鉢植え（木とは別物・揺れない） -->
-    <g class="hit" data-part="other">${pots}</g>
-
-    <!-- うっすらラベル（株／債券／その他） -->
-    ${labels}
+    <path d="M 0 ${GROUND} Q ${width/2} ${GROUND-26} ${width} ${GROUND} L ${width} ${VH} L 0 ${VH} Z" fill="var(--ground)"/>
+    <path d="M 0 ${GROUND} Q ${width/2} ${GROUND-26} ${width} ${GROUND}" stroke="var(--ground-dk)" stroke-width="3" fill="none" opacity="0.5"/>
+    ${body}
   </svg>`;
-  return svg;
+}
+
+// 単体表示（従来どおり）
+function buildTree(t) {
+  const P = buildTreeParts(t);
+  return treeScene(VW, P.gust, P.inner);
+}
+
+// 等身大の横並び比較：同じ地面に「いまの木」と「理想の木」を並べる
+function buildComparison(tNow, tIdeal) {
+  const A = buildTreeParts(tNow);
+  const B = buildTreeParts(tIdeal, { noLabels: true });   // ラベルは重複を避けて省略
+  // ラベルは木の足元（地面）に置く。上部は残高カードやトグルと重なるため。
+  const cap = (x, txt) => {
+    const s = `text-anchor="middle" font-weight="700" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.8" stroke-linejoin="round" style="font-family:inherit" pointer-events="none"`;
+    return `<text x="${x}" y="${VH - 12}" ${s} font-size="14.5" fill="#6f5a3a">${txt}</text>`;
+  };
+  const body =
+    `<g>${A.inner}</g>` +
+    `<g transform="translate(${VW},0)" style="pointer-events:none">${B.inner}</g>` +
+    cap(CX, "いまの木") +
+    cap(CX + VW, "理想の木（年齢の目安）");
+  return treeScene(VW * 2, A.gust, body);
 }
 
 /* =========================================================================
@@ -1638,7 +1636,12 @@ function renderAll() {
   t.cashCoverage = nd.necessary > 0 ? state.cash / nd.necessary : 1;
   t.excessCash = Math.max(0, state.cash - nd.necessary);
 
-  $("treeHost").innerHTML = buildTree(t);
+  if (showIdeal) {
+    const it = idealTreeParam(nd);
+    $("treeHost").innerHTML = it ? buildComparison(t, it) : buildTree(t);
+  } else {
+    $("treeHost").innerHTML = buildTree(t);
+  }
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
@@ -1646,7 +1649,6 @@ function renderAll() {
   renderHealth();
   renderMethod();
   renderProj(t);
-  renderIdealTree(nd);
   renderAllocGuide();
   // slider value labels
   $("vAge").textContent = state.age + "歳";
@@ -1862,14 +1864,17 @@ function bindReadModal(openId, modalId) {
 const closeRateHelp = bindReadModal("rateHelpOpen", "rateHelp");
 const closeBalanceHelp = bindReadModal("balanceHelpOpen", "balanceHelp");
 
-// 理想の木の表示トグル（状態を localStorage に保持）
+// 「いまの木／理想の木」の横並び比較トグル（既定ON・状態を保持）
+let showIdeal = true;   // 実際の復元は起動時に lsGet で行う（定義順のため）
+function updateIdealToggle() { $("idealToggle").textContent = showIdeal ? "比較を閉じる ✕" : "🌳 理想の木と比べる"; }
 function setIdeal(show) {
-  $("idealInset").hidden = !show;
-  $("idealShow").hidden = show;
+  showIdeal = show;
   lsSet("okane_idealHidden", show ? "0" : "1");
+  updateIdealToggle();
+  renderAll();
 }
-$("idealClose").addEventListener("click", () => setIdeal(false));
-$("idealShow").addEventListener("click", () => setIdeal(true));
+$("idealToggle").addEventListener("click", () => setIdeal(!showIdeal));
+updateIdealToggle();
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
@@ -1935,12 +1940,11 @@ function bootAuth() {
   else showOnboarding();
 }
 
-// ===== 理想の木（年齢の目安の姿）を横に表示 =====
+// ===== 理想の木（年齢の目安の姿）の描画パラメータ =====
 // 同じ投資総額を、年齢に合った株:債で・しっかり分散・健やかな根（必要現金）で持った姿。
-function renderIdealTree(nd) {
-  const host = $("idealHost");
+function idealTreeParam(nd) {
   const invested = state.equity + state.bond + state.other;
-  if (invested <= 0) { host.innerHTML = `<div style="font-size:10px;color:var(--ink-soft);padding:10px;text-align:center">まず投資を始めると<br>目安の姿が出ます</div>`; return; }
+  if (invested <= 0) return null;   // まだ投資ゼロなら比較対象なし
   const tgt = targetEquityPct(state.age) / 100;
   const need = (nd || computeNeeds()).necessary;
   const is = {
@@ -1951,7 +1955,7 @@ function renderIdealTree(nd) {
   };
   const it = deriveTree(is);
   it.cash = need; it.necessaryCash = need; it.cashCoverage = 1; it.excessCash = 0;
-  host.innerHTML = buildTree(it);
+  return it;
 }
 
 // ===== ③ 積立配分スライダーに「年齢のおすすめ」目安を表示し、次の一手を案内 =====
@@ -1972,9 +1976,10 @@ function renderAllocGuide() {
 
 // 起動
 syncSliders();
+if (lsGet("okane_idealHidden") === "1") showIdeal = false;
+updateIdealToggle();
 renderAll();
 bootAuth();
-if (lsGet("okane_idealHidden") === "1") setIdeal(false);
 </script>
 
 <style>
