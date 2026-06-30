@@ -397,6 +397,20 @@
   .pc-label { font-weight: 700; font-size: 13px; color: var(--ink); }
   .pc-note { font-size: 11px; color: var(--ink-soft); line-height: 1.4; }
   @media (max-width: 480px) { .persona-grid { grid-template-columns: 1fr; } }
+  /* 現金の置き場所ガイド */
+  .rate-card { max-width: 480px; }
+  .rate-table { width: 100%; border-collapse: collapse; margin: 12px 0 4px; font-size: 11.5px; }
+  .rate-table th, .rate-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid #ecdfc8; vertical-align: top; }
+  .rate-table th { font-size: 11px; color: var(--ink-soft); font-weight: 700; }
+  .rate-table td { color: var(--ink); }
+  .rt-sub { display: block; font-size: 10px; color: var(--ink-soft); opacity: 0.8; margin-top: 1px; }
+  .rate-table tr.rt-best td { background: #eef7ea; }
+  .rate-table tr.rt-best td:first-child { font-weight: 700; border-left: 3px solid var(--accent); }
+  .rate-tips { margin: 4px 0 8px; padding-left: 18px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+  .rate-tips li { margin: 5px 0; }
+  .rate-tips b { color: var(--ink); }
+  .rate-foot { margin: 8px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.6; background: #fbf6ec; border-radius: 10px; padding: 9px 11px; }
+  .rate-foot b { color: var(--accent-dk); }
 </style>
 </head>
 <body>
@@ -428,6 +442,7 @@
         <input type="range" id="iNear" min="0" max="2000" step="10" value="50">
         <button type="button" class="help-link" id="needsHelpOpen">考え方が分からない方・詳細はこちら ›</button>
         <div id="needsResult" class="needs-result"></div>
+        <button type="button" class="help-link" id="rateHelpOpen">さらに金利を追求したい人へ・現金の置き場所 ›</button>
       </details>
 
       <details class="box needs">
@@ -519,6 +534,33 @@
     <h3>近い状態を選んでスタート</h3>
     <p>あなたに一番近いタイプを選ぶと、その資産構成で木が育ち始めます。保有商品や金額は<b>あとから調整できます</b>。<span class="muted">いずれは口座連携で自動反映できるようにします。</span></p>
     <div class="persona-grid" id="personaGrid"></div>
+  </div>
+</div>
+
+<!-- 現金の置き場所ガイド（金利を追求したい人向け） -->
+<div class="modal-overlay" id="rateHelp" hidden>
+  <div class="modal rate-card" role="dialog" aria-modal="true" aria-label="現金の置き場所">
+    <button type="button" class="modal-x" id="rateHelpClose" aria-label="閉じる">×</button>
+    <h3>現金の置き場所で、利息は変わる</h3>
+    <p>同じ「現金」でも、どこに置くかで受け取る利息が変わります。<b>使う予定の近さ</b>に合わせて選ぶのがコツ。<span class="muted">※金利は目安で、時期や金融機関により変わります（2026年時点の代表例）。</span></p>
+
+    <table class="rate-table">
+      <thead><tr><th>置き場所</th><th>金利の目安<br>(年)</th><th>引き出し</th><th>向くお金</th></tr></thead>
+      <tbody>
+        <tr><td>MRF<span class="rt-sub">証券口座の待機資金</span></td><td>〜0.1%前後</td><td>すぐ可</td><td>投資の待機資金</td></tr>
+        <tr><td>普通預金<span class="rt-sub">大手銀行</span></td><td>0.02〜0.1%</td><td>いつでも</td><td>日常の出し入れ</td></tr>
+        <tr class="rt-best"><td>優遇金利の口座<span class="rt-sub">ネット銀行・証券連携など</span></td><td>0.1〜0.3%</td><td>いつでも</td><td>生活防衛資金</td></tr>
+        <tr><td>定期預金<span class="rt-sub">満期まで固定</span></td><td>0.1〜0.5%</td><td>満期まで<br>原則固定</td><td>当面使わないお金</td></tr>
+      </tbody>
+    </table>
+
+    <h4>おすすめの置き分け</h4>
+    <ul class="rate-tips">
+      <li><b>生活防衛資金・すぐ使うお金</b> → <b>優遇金利のネット銀行（普通預金）</b>。いつでも引き出せて金利が高いのが基本。証券口座との連携（例：マネーブリッジ）で優遇されるものも。</li>
+      <li><b>投資の待機資金</b> → 証券口座の<b>MRF</b>。そのまま買付に回せる。</li>
+      <li><b>1〜3年使う予定が決まっているお金</b> → <b>定期預金</b>や<b>個人向け国債（変動10年）</b>。すぐ使わない分だけ、金利の高い場所へ。</li>
+    </ul>
+    <p class="rate-foot">ポイントは「いつでも引き出せる安全性」と「金利」のバランス。<b>守りの現金は優遇金利の普通預金、使わないと決めた分だけ定期へ</b>が基本形です。</p>
   </div>
 </div>
 
@@ -1728,7 +1770,18 @@ $("needsHelpOpen").addEventListener("click", openNeedsHelp);
 $("needsHelpClose").addEventListener("click", closeNeedsHelp);
 $("needsHelpApply").addEventListener("click", applyNeedsHelp);
 $("needsHelp").addEventListener("click", (e) => { if (e.target === $("needsHelp")) closeNeedsHelp(); });
-document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("needsHelp").hidden) closeNeedsHelp(); });
+
+// 現金の置き場所ガイド（読むだけのモーダル）
+const openRateHelp = () => { $("rateHelp").hidden = false; };
+const closeRateHelp = () => { $("rateHelp").hidden = true; };
+$("rateHelpOpen").addEventListener("click", openRateHelp);
+$("rateHelpClose").addEventListener("click", closeRateHelp);
+$("rateHelp").addEventListener("click", (e) => { if (e.target === $("rateHelp")) closeRateHelp(); });
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape") return;
+  if (!$("needsHelp").hidden) closeNeedsHelp();
+  if (!$("rateHelp").hidden) closeRateHelp();
+});
 // 急な出費への対応：そのまま / 売る / 担保ローン
 document.querySelectorAll(".method-btn").forEach(btn => {
   btn.addEventListener("click", () => {
