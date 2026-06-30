@@ -438,6 +438,8 @@
   .tree-carousel::-webkit-scrollbar { display: none; }
   .tree-slide { flex: 0 0 100%; scroll-snap-align: center; position: relative; }
   .tree-slide svg.tree { display: block; width: 100%; height: auto; }
+  /* どのモードでも木が縦に画面からはみ出さない安全上限（PCの単体表示など） */
+  #treeHost svg.tree { max-height: 74vh; }
   .slide-cap { position: absolute; left: 0; right: 0; bottom: 22px; text-align: center;
     font-size: 13px; font-weight: 700; color: #6f5a3a; pointer-events: none;
     text-shadow: 0 0 4px #fdf6e9, 0 0 4px #fdf6e9, 0 0 4px #fdf6e9; }
@@ -1321,6 +1323,25 @@ function buildCarousel(tNow, tIdeal) {
   return `<div class="tree-carousel" id="treeCarousel">${slides}</div>${controls}`;
 }
 
+// PC（横幅に余裕がある）向け：同じ地面に「いまの木」「理想の木」を並べて1画面表示。
+// viewBox 幅が2倍になるぶん高さは低くなり、縦に切れずに収まる。
+function buildComparison(tNow, tIdeal) {
+  const A = buildTreeParts(tNow);
+  const B = buildTreeParts(tIdeal, { noLabels: true });
+  const cap = (x, txt) => {
+    const s = `text-anchor="middle" font-weight="700" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.8" stroke-linejoin="round" style="font-family:inherit" pointer-events="none"`;
+    return `<text x="${x}" y="${VH - 12}" ${s} font-size="14.5" fill="#6f5a3a">${txt}</text>`;
+  };
+  const body =
+    `<g>${A.inner}</g>` +
+    `<g transform="translate(${VW},0)" style="pointer-events:none">${B.inner}</g>` +
+    cap(CX, "いまの木") + cap(CX + VW, "理想の木（年齢の目安）");
+  return treeScene(VW * 2, A.gust, body);
+}
+
+// PC幅では横並び比較、狭い画面ではスワイプ式カルーセル
+const wideMode = () => window.matchMedia("(min-width: 760px)").matches;
+
 /* =========================================================================
    タップ解説（§5）— 状態に応じて文面を動的生成
    ========================================================================= */
@@ -1648,8 +1669,13 @@ function renderAll() {
   t.cashCoverage = nd.necessary > 0 ? state.cash / nd.necessary : 1;
   t.excessCash = Math.max(0, state.cash - nd.necessary);
 
-  $("treeHost").innerHTML = buildCarousel(t, idealTreeParam(nd));
-  initCarousel();
+  const it = idealTreeParam(nd);
+  if (wideMode() && it) {
+    $("treeHost").innerHTML = buildComparison(t, it);   // PC：横並びで1画面に収める
+  } else {
+    $("treeHost").innerHTML = buildCarousel(t, it);      // モバイル：全幅＋スワイプ
+    initCarousel();
+  }
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
@@ -1900,6 +1926,12 @@ function initCarousel() {
   if ($("carNext")) $("carNext").addEventListener("click", () => car.scrollTo({ left: car.clientWidth, behavior: "smooth" }));
   if ($("carPrev")) $("carPrev").addEventListener("click", () => car.scrollTo({ left: 0, behavior: "smooth" }));
 }
+// 画面幅が比較⇄スワイプの境界をまたいだら描画モードを切り替える
+let lastWide = wideMode(), rzTmr;
+window.addEventListener("resize", () => {
+  clearTimeout(rzTmr);
+  rzTmr = setTimeout(() => { if (wideMode() !== lastWide) { lastWide = wideMode(); renderAll(); } }, 150);
+});
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
