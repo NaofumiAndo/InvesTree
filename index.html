@@ -154,6 +154,10 @@
   .balance .who { font-size: 12px; color: var(--ink-soft); }
   .balance .amt { font-size: 24px; font-weight: 700; letter-spacing: 0.02em; }
   .balance .delta { font-size: 12px; color: var(--accent-dk); font-weight: 600; }
+  .balance .acc-period { display: inline-flex; align-items: center; gap: 5px; margin: 4px 0 2px;
+    padding: 3px 11px; border-radius: 12px; background: #e7f3e2; color: #4f8a52;
+    font-size: 14px; font-weight: 700; }
+  .balance .acc-period b { font-size: 16px; }
   .tree-hint {
     position: absolute;
     bottom: 12px;
@@ -467,6 +471,7 @@
       <div class="balance">
         <div class="who" id="who"></div>
         <div class="amt" id="amt"></div>
+        <div class="acc-period" id="accPeriod"></div>
         <div class="delta" id="delta"></div>
       </div>
       <div id="treeHost"></div>
@@ -1534,17 +1539,28 @@ function renderHoldings(t) {
   });
 }
 
+// 積立年数（小数）→「◯年◯ヶ月」
+function periodText(years) {
+  const tm = Math.max(0, Math.round((years || 0) * 12));
+  const y = Math.floor(tm / 12), m = tm % 12;
+  if (y <= 0) return `${m}ヶ月`;
+  if (m === 0) return `${y}年`;
+  return `${y}年${m}ヶ月`;
+}
+
 function renderBalance(t) {
   const p = currentProfile();
   if (projInfo && projInfo.active) {
     $("who").textContent = `${projInfo.years}年後の予測（${projInfo.age}歳）`;
     $("amt").textContent = "¥" + Math.round(projInfo.total).toLocaleString();
+    $("accPeriod").innerHTML = `🌱 つみたて <b>${periodText(state.years + projInfo.years)}</b>`;
     $("delta").textContent = `これからの積立で育った姿`;
     return;
   }
   const total = state.equity + state.bond + state.other;
   $("who").textContent = custom ? "カスタム設定" : `${p.name}・${p.note}`;
   $("amt").textContent = "¥" + total.toLocaleString();
+  $("accPeriod").innerHTML = `🌱 つみたて <b>${periodText(state.years)}</b>`;
   // 中長期投資なので「前日比」ではなく、これまでの合計運用益（概算）を表示。
   const { gain, principal } = estimateGain(total, state.years);
   const pct = principal > 0 ? (gain / principal * 100) : 0;
