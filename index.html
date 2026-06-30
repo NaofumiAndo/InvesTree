@@ -411,6 +411,17 @@
   .rate-tips b { color: var(--ink); }
   .rate-foot { margin: 8px 0 0; font-size: 12px; color: var(--ink-soft); line-height: 1.6; background: #fbf6ec; border-radius: 10px; padding: 9px 11px; }
   .rate-foot b { color: var(--accent-dk); }
+  /* おまかせでバランスを整える */
+  .balance-card { max-width: 480px; }
+  .bh-method { border: 1.5px solid #ead9bd; border-radius: 12px; padding: 10px 12px; margin: 10px 0; }
+  .bh-method h4 { margin: 0 0 4px; font-size: 13.5px; color: var(--accent-dk); }
+  .bh-method p { margin: 0 0 5px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+  .bh-caution { color: #c2872f; font-size: 11.5px; }
+  .bh-tips { margin: 4px 0 8px; padding-left: 18px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; }
+  .bh-tips li { margin: 5px 0; }
+  .bh-tips b { color: var(--ink); }
+  .bh-foot { margin-top: 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; background: #fbf6ec; border-radius: 10px; padding: 9px 11px; }
+  .bh-foot b { color: var(--accent-dk); }
 </style>
 </head>
 <body>
@@ -451,6 +462,7 @@
         <input type="range" id="iRetire" min="50" max="80" step="1" value="65">
         <div id="holdHealth" class="needs-result"></div>
         <div id="holdings" style="margin-top:10px"></div>
+        <button type="button" class="help-link" id="balanceHelpOpen">自分でバランスを調整したくない人へ ›</button>
       </details>
 
       <details class="box needs">
@@ -534,6 +546,38 @@
     <h3>近い状態を選んでスタート</h3>
     <p>あなたに一番近いタイプを選ぶと、その資産構成で木が育ち始めます。保有商品や金額は<b>あとから調整できます</b>。<span class="muted">いずれは口座連携で自動反映できるようにします。</span></p>
     <div class="persona-grid" id="personaGrid"></div>
+  </div>
+</div>
+
+<!-- おまかせでバランスを整える（バランス/ターゲットデートファンド） -->
+<div class="modal-overlay" id="balanceHelp" hidden>
+  <div class="modal balance-card" role="dialog" aria-modal="true" aria-label="おまかせでバランスを整える">
+    <button type="button" class="modal-x" id="balanceHelpClose" aria-label="閉じる">×</button>
+    <h3>自分で調整したくない人へ — おまかせで整える</h3>
+    <p>株と債券の比率を自分で見直す（リバランス）のが面倒・不安なら、中身を自動で調整してくれる「おまかせ型」のファンドを使う手があります。</p>
+
+    <div class="bh-method">
+      <h4>🧺 バランスファンド（固定配分型）</h4>
+      <p>株・債券・REITなどを決めた比率で持ち、ファンドが自動でリバランス。1本で分散でき、ほったらかしでも配分が保たれます。</p>
+      <p class="bh-caution">⚠ 比率は固定なので、年齢が上がっても自動では保守化しません（②のおすすめ比率には自動で寄らない）。信託報酬は単品の組み合わせより高めなことも。</p>
+    </div>
+
+    <div class="bh-method">
+      <h4>📅 ターゲットデートファンド（ターゲットイヤー型）</h4>
+      <p>退職予定の年（例：2050年）を選ぶと、若いうちは株多め → 年齢とともに自動で債券多めへ切り替わります（グライドパス）。②の「年齢に合わせる」をファンドが代行してくれます。</p>
+      <p class="bh-caution">⚠ 商品ごとにグライドパスや最終的な配分が違います。信託報酬はやや高め。中身を見ないまま放置になりがちな点も注意。</p>
+    </div>
+
+    <h4>共通の注意点</h4>
+    <ul class="bh-tips">
+      <li>楽な代わりに<b>コスト（信託報酬）が単品より高め</b>なことが多い。長期では地味に効きます。</li>
+      <li>他の保有商品と合算すると、結局バランスが崩れることがある（例：バランスファンド＋個別株）。<b>全体で見る</b>意識を。</li>
+      <li>中身がブラックボックス化しやすい。たまに構成比を確認しましょう。</li>
+    </ul>
+
+    <div class="bh-foot">
+      <b>迷ったら：</b>年齢に合わせた調整まで任せたい → <b>ターゲットデートファンド</b>／配分は自分で決めて日々の調整だけ任せたい → <b>バランスファンド</b>。
+    </div>
   </div>
 </div>
 
@@ -1771,16 +1815,22 @@ $("needsHelpClose").addEventListener("click", closeNeedsHelp);
 $("needsHelpApply").addEventListener("click", applyNeedsHelp);
 $("needsHelp").addEventListener("click", (e) => { if (e.target === $("needsHelp")) closeNeedsHelp(); });
 
-// 現金の置き場所ガイド（読むだけのモーダル）
-const openRateHelp = () => { $("rateHelp").hidden = false; };
-const closeRateHelp = () => { $("rateHelp").hidden = true; };
-$("rateHelpOpen").addEventListener("click", openRateHelp);
-$("rateHelpClose").addEventListener("click", closeRateHelp);
-$("rateHelp").addEventListener("click", (e) => { if (e.target === $("rateHelp")) closeRateHelp(); });
+// 読むだけのモーダル（現金の置き場所／おまかせでバランス）
+function bindReadModal(openId, modalId) {
+  const open = () => { $(modalId).hidden = false; };
+  const close = () => { $(modalId).hidden = true; };
+  $(openId).addEventListener("click", open);
+  $(modalId).querySelector(".modal-x").addEventListener("click", close);
+  $(modalId).addEventListener("click", (e) => { if (e.target === $(modalId)) close(); });
+  return close;
+}
+const closeRateHelp = bindReadModal("rateHelpOpen", "rateHelp");
+const closeBalanceHelp = bindReadModal("balanceHelpOpen", "balanceHelp");
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
   if (!$("rateHelp").hidden) closeRateHelp();
+  if (!$("balanceHelp").hidden) closeBalanceHelp();
 });
 // 急な出費への対応：そのまま / 売る / 担保ローン
 document.querySelectorAll(".method-btn").forEach(btn => {
