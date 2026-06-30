@@ -422,6 +422,29 @@
   .bh-tips b { color: var(--ink); }
   .bh-foot { margin-top: 8px; font-size: 12px; color: var(--ink-soft); line-height: 1.6; background: #fbf6ec; border-radius: 10px; padding: 9px 11px; }
   .bh-foot b { color: var(--accent-dk); }
+  /* ③ 積立配分スライダーの「おすすめ」目安マーカー */
+  .slider-wrap { position: relative; }
+  .slider-wrap input[type="range"] { position: relative; z-index: 2; }
+  .slider-mark { position: absolute; top: -2px; transform: translateX(-50%); z-index: 1; pointer-events: none; display: flex; flex-direction: column; align-items: center; }
+  .sm-tick { width: 2px; height: 26px; background: var(--accent-dk); border-radius: 1px; opacity: 0.8; }
+  .sm-lab { margin-top: 1px; font-size: 9.5px; font-weight: 700; color: var(--accent-dk); white-space: nowrap; }
+  .alloc-hint { margin-top: 18px; font-size: 11.5px; line-height: 1.5; }
+  .alloc-hint .ah-ok { color: #4f8a52; font-weight: 700; }
+  .alloc-hint .ah-move { color: #c2872f; }
+  /* 理想の木（目安）インセット */
+  .ideal-inset { position: absolute; top: 10px; right: 10px; width: 34%; max-width: 168px; z-index: 4;
+    background: rgba(255,253,248,0.82); border: 1.5px solid #e3d4b6; border-radius: 14px; padding: 4px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+  .ideal-inset[hidden] { display: none; }
+  .ideal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
+    font-size: 10px; font-weight: 700; color: var(--ink-soft); padding: 2px 2px 1px 6px; line-height: 1.25; }
+  .ideal-sub { font-weight: 400; font-size: 9px; opacity: 0.85; }
+  .ideal-x { background: none; border: none; font-size: 16px; line-height: 1; color: var(--ink-soft); cursor: pointer; padding: 0 2px; }
+  .ideal-inset svg.tree { display: block; width: 100%; height: auto; border-radius: 10px; }
+  .ideal-show { position: absolute; top: 10px; right: 10px; z-index: 4; background: rgba(255,253,248,0.92);
+    border: 1.5px solid #e3d4b6; border-radius: 20px; padding: 5px 11px; font: inherit; font-size: 11px;
+    font-weight: 700; color: var(--accent-dk); cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
+  .ideal-show[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -439,6 +462,12 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
+      <!-- 理想の木（年齢の目安）。デフォルト表示・ワンクリックでしまえる -->
+      <div class="ideal-inset" id="idealInset">
+        <div class="ideal-head"><span>🌳 理想の木<br><span class="ideal-sub">あなたの年齢の目安</span></span><button type="button" class="ideal-x" id="idealClose" aria-label="閉じる">×</button></div>
+        <div id="idealHost"></div>
+      </div>
+      <button type="button" class="ideal-show" id="idealShow" hidden>🌳 理想の木を見る</button>
     </div>
 
     <div class="panel">
@@ -471,7 +500,11 @@
         <label>毎月の積立額 <span class="v" id="vContrib"></span></label>
         <input type="range" id="iContrib" min="0" max="30" step="1" value="5">
         <label>これからの積立を株にまわす割合 <span class="v" id="vEquityAlloc"></span></label>
-        <input type="range" id="iEquityAlloc" min="0" max="100" step="5" value="70">
+        <div class="slider-wrap">
+          <input type="range" id="iEquityAlloc" min="0" max="100" step="5" value="70">
+          <div class="slider-mark" id="allocMark"><span class="sm-tick"></span><span class="sm-lab">おすすめ</span></div>
+        </div>
+        <div class="alloc-hint" id="allocHint"></div>
         <label>何年後を見る <span class="v" id="vProjYears"></span></label>
         <input type="range" id="iProjYears" min="0" max="30" step="1" value="0">
         <div id="projResult" class="needs-result"></div>
@@ -1613,6 +1646,8 @@ function renderAll() {
   renderHealth();
   renderMethod();
   renderProj(t);
+  renderIdealTree(nd);
+  renderAllocGuide();
   // slider value labels
   $("vAge").textContent = state.age + "歳";
   $("vYears").textContent = state.years.toFixed(1) + "年";
@@ -1826,6 +1861,15 @@ function bindReadModal(openId, modalId) {
 }
 const closeRateHelp = bindReadModal("rateHelpOpen", "rateHelp");
 const closeBalanceHelp = bindReadModal("balanceHelpOpen", "balanceHelp");
+
+// 理想の木の表示トグル（状態を localStorage に保持）
+function setIdeal(show) {
+  $("idealInset").hidden = !show;
+  $("idealShow").hidden = show;
+  lsSet("okane_idealHidden", show ? "0" : "1");
+}
+$("idealClose").addEventListener("click", () => setIdeal(false));
+$("idealShow").addEventListener("click", () => setIdeal(true));
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
@@ -1891,10 +1935,46 @@ function bootAuth() {
   else showOnboarding();
 }
 
+// ===== 理想の木（年齢の目安の姿）を横に表示 =====
+// 同じ投資総額を、年齢に合った株:債で・しっかり分散・健やかな根（必要現金）で持った姿。
+function renderIdealTree(nd) {
+  const host = $("idealHost");
+  const invested = state.equity + state.bond + state.other;
+  if (invested <= 0) { host.innerHTML = `<div style="font-size:10px;color:var(--ink-soft);padding:10px;text-align:center">まず投資を始めると<br>目安の姿が出ます</div>`; return; }
+  const tgt = targetEquityPct(state.age) / 100;
+  const need = (nd || computeNeeds()).necessary;
+  const is = {
+    age: state.age, years: state.years,
+    divScore: 3.4, bondDivScore: 3.0, bondRisk: 0.12,
+    equity: invested * tgt, bond: invested * (1 - tgt), other: 0,
+    cash: need,
+  };
+  const it = deriveTree(is);
+  it.cash = need; it.necessaryCash = need; it.cashCoverage = 1; it.excessCash = 0;
+  host.innerHTML = buildTree(it);
+}
+
+// ===== ③ 積立配分スライダーに「年齢のおすすめ」目安を表示し、次の一手を案内 =====
+function renderAllocGuide() {
+  const target = Math.round(targetEquityPct(state.age));   // 年齢に合う株%
+  $("allocMark").style.left = target + "%";
+  const now = Math.round(equityAlloc * 100);
+  const hint = $("allocHint");
+  const diff = now - target;
+  if (Math.abs(diff) <= 3) {
+    hint.innerHTML = `<span class="ah-ok">✓ 年齢の目安どおり（株${target}%）。この振り分けが理想の木に近づけます。</span>`;
+  } else if (diff > 0) {
+    hint.innerHTML = `<span class="ah-move">▲ いまは株${now}%。つまみを「おすすめ（株${target}%）」まで左に動かすと、理想の木に近づきます。</span>`;
+  } else {
+    hint.innerHTML = `<span class="ah-move">▲ いまは株${now}%。つまみを「おすすめ（株${target}%）」まで右に動かすと、理想の木に近づきます。</span>`;
+  }
+}
+
 // 起動
 syncSliders();
 renderAll();
 bootAuth();
+if (lsGet("okane_idealHidden") === "1") setIdeal(false);
 </script>
 
 <style>
