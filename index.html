@@ -431,12 +431,27 @@
   .alloc-hint { margin-top: 18px; font-size: 11.5px; line-height: 1.5; }
   .alloc-hint .ah-ok { color: #4f8a52; font-weight: 700; }
   .alloc-hint .ah-move { color: #c2872f; }
-  /* 理想の木 比較トグル */
-  .ideal-toggle { position: absolute; top: 10px; right: 10px; z-index: 4;
-    background: rgba(255,253,248,0.92); border: 1.5px solid #e3d4b6; border-radius: 20px;
-    padding: 5px 12px; font: inherit; font-size: 11px; font-weight: 700; color: var(--accent-dk);
-    cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,0.12); }
-  .ideal-toggle:hover { background: #fff; }
+  /* いまの木 ⇄ 理想の木：スワイプ/矢印で切り替えるカルーセル */
+  #treeHost { position: relative; }
+  .tree-carousel { display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+    scroll-behavior: smooth; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .tree-carousel::-webkit-scrollbar { display: none; }
+  .tree-slide { flex: 0 0 100%; scroll-snap-align: center; position: relative; }
+  .tree-slide svg.tree { display: block; width: 100%; height: auto; }
+  .slide-cap { position: absolute; left: 0; right: 0; bottom: 22px; text-align: center;
+    font-size: 13px; font-weight: 700; color: #6f5a3a; pointer-events: none;
+    text-shadow: 0 0 4px #fdf6e9, 0 0 4px #fdf6e9, 0 0 4px #fdf6e9; }
+  .car-arrow { position: absolute; top: 46%; transform: translateY(-50%); z-index: 5;
+    background: rgba(255,253,248,0.94); border: 1.5px solid #e3d4b6; border-radius: 16px;
+    padding: 9px 8px; font: inherit; font-size: 11px; font-weight: 700; line-height: 1.2;
+    color: var(--accent-dk); cursor: pointer; box-shadow: 0 3px 12px rgba(0,0,0,0.16); text-align: center; }
+  .car-arrow:hover { background: #fff; }
+  .car-next { right: 8px; } .car-prev { left: 8px; }
+  .car-arrow[hidden] { display: none; }
+  .car-dots { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 6px; z-index: 5; pointer-events: none; }
+  .car-dots span { width: 7px; height: 7px; border-radius: 50%; background: rgba(120,100,70,0.3); }
+  .car-dots span.on { background: var(--accent-dk); }
 </style>
 </head>
 <body>
@@ -454,8 +469,6 @@
       </div>
       <div id="treeHost"></div>
       <div class="bubble" id="bubble"></div>
-      <!-- 等身大で「いまの木／理想の木」を横並び比較するトグル（既定ON） -->
-      <button type="button" class="ideal-toggle" id="idealToggle"></button>
     </div>
 
     <div class="panel">
@@ -1292,21 +1305,20 @@ function buildTree(t) {
   return treeScene(VW, P.gust, P.inner);
 }
 
-// 等身大の横並び比較：同じ地面に「いまの木」と「理想の木」を並べる
-function buildComparison(tNow, tIdeal) {
-  const A = buildTreeParts(tNow);
-  const B = buildTreeParts(tIdeal, { noLabels: true });   // ラベルは重複を避けて省略
-  // ラベルは木の足元（地面）に置く。上部は残高カードやトグルと重なるため。
-  const cap = (x, txt) => {
-    const s = `text-anchor="middle" font-weight="700" paint-order="stroke" stroke="#fdf6e9" stroke-width="3.8" stroke-linejoin="round" style="font-family:inherit" pointer-events="none"`;
-    return `<text x="${x}" y="${VH - 12}" ${s} font-size="14.5" fill="#6f5a3a">${txt}</text>`;
-  };
-  const body =
-    `<g>${A.inner}</g>` +
-    `<g transform="translate(${VW},0)" style="pointer-events:none">${B.inner}</g>` +
-    cap(CX, "いまの木") +
-    cap(CX + VW, "理想の木（年齢の目安）");
-  return treeScene(VW * 2, A.gust, body);
+// スワイプ/矢印で切り替えるカルーセル：各木を画面いっぱいの大きさで表示。
+// スライド1＝いまの木（操作可）、スライド2＝理想の木（年齢の目安）。
+function buildCarousel(tNow, tIdeal) {
+  const slide = (svg, cap) => `<div class="tree-slide">${svg}<div class="slide-cap">${cap}</div></div>`;
+  let slides = slide(buildTree(tNow), "いまの木");
+  let controls = "";
+  if (tIdeal) {
+    slides += slide(buildTree(tIdeal), "理想の木（年齢の目安）");
+    controls =
+      `<button type="button" class="car-arrow car-next" id="carNext" aria-label="理想の木を見る">理想<br>→</button>` +
+      `<button type="button" class="car-arrow car-prev" id="carPrev" aria-label="いまの木に戻る" hidden>←<br>いま</button>` +
+      `<div class="car-dots" id="carDots"><span></span><span></span></div>`;
+  }
+  return `<div class="tree-carousel" id="treeCarousel">${slides}</div>${controls}`;
 }
 
 /* =========================================================================
@@ -1636,12 +1648,8 @@ function renderAll() {
   t.cashCoverage = nd.necessary > 0 ? state.cash / nd.necessary : 1;
   t.excessCash = Math.max(0, state.cash - nd.necessary);
 
-  if (showIdeal) {
-    const it = idealTreeParam(nd);
-    $("treeHost").innerHTML = it ? buildComparison(t, it) : buildTree(t);
-  } else {
-    $("treeHost").innerHTML = buildTree(t);
-  }
+  $("treeHost").innerHTML = buildCarousel(t, idealTreeParam(nd));
+  initCarousel();
   $("bubble").classList.remove("show");
   renderBalance(t);
   renderHoldings(t);
@@ -1864,17 +1872,34 @@ function bindReadModal(openId, modalId) {
 const closeRateHelp = bindReadModal("rateHelpOpen", "rateHelp");
 const closeBalanceHelp = bindReadModal("balanceHelpOpen", "balanceHelp");
 
-// 「いまの木／理想の木」の横並び比較トグル（既定ON・状態を保持）
-let showIdeal = true;   // 実際の復元は起動時に lsGet で行う（定義順のため）
-function updateIdealToggle() { $("idealToggle").textContent = showIdeal ? "比較を閉じる ✕" : "🌳 理想の木と比べる"; }
-function setIdeal(show) {
-  showIdeal = show;
-  lsSet("okane_idealHidden", show ? "0" : "1");
-  updateIdealToggle();
-  renderAll();
+// カルーセル制御（いまの木 ⇄ 理想の木）。再描画をまたいでスライド位置を保持。
+let carIndex = 0;
+function applyCarUI(i) {
+  if ($("carPrev")) $("carPrev").hidden = i === 0;
+  if ($("carNext")) { const car = $("treeCarousel"); $("carNext").hidden = i >= (car ? car.children.length : 1) - 1; }
+  const dots = $("carDots");
+  if (dots) [...dots.children].forEach((d, k) => d.classList.toggle("on", k === i));
 }
-$("idealToggle").addEventListener("click", () => setIdeal(!showIdeal));
-updateIdealToggle();
+function updateCarUI() {
+  const car = $("treeCarousel"); if (!car) return;
+  const w = Math.max(1, car.clientWidth);
+  carIndex = Math.max(0, Math.min(car.children.length - 1, Math.round(car.scrollLeft / w)));
+  applyCarUI(carIndex);
+}
+function initCarousel() {
+  const car = $("treeCarousel"); if (!car) return;
+  carIndex = Math.min(carIndex, car.children.length - 1);
+  // 位置を即時復元（smoothだと読み戻しでindexが0に戻るため一時的にautoへ）
+  const sb = car.style.scrollBehavior;
+  car.style.scrollBehavior = "auto";
+  car.scrollLeft = carIndex * car.clientWidth;   // clientWidth参照でレイアウト確定
+  car.style.scrollBehavior = sb;
+  applyCarUI(carIndex);
+  let tmr;
+  car.addEventListener("scroll", () => { clearTimeout(tmr); tmr = setTimeout(updateCarUI, 60); }, { passive: true });
+  if ($("carNext")) $("carNext").addEventListener("click", () => car.scrollTo({ left: car.clientWidth, behavior: "smooth" }));
+  if ($("carPrev")) $("carPrev").addEventListener("click", () => car.scrollTo({ left: 0, behavior: "smooth" }));
+}
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
   if (!$("needsHelp").hidden) closeNeedsHelp();
@@ -1976,8 +2001,6 @@ function renderAllocGuide() {
 
 // 起動
 syncSliders();
-if (lsGet("okane_idealHidden") === "1") showIdeal = false;
-updateIdealToggle();
 renderAll();
 bootAuth();
 </script>
