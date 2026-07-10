@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>おかねの機会損失マップ</title>
+<style>
+  :root {
+    --ink: #5b4a3a;
+    --ink-soft: #8a7560;
+    --card: #fffaf2;
+    --accent: #6fae6a;
+    --accent-dk: #4f8a52;
+    --warn: #c2872f;
+    --bad: #c2703a;
+    --shadow: rgba(120, 95, 60, 0.18);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    font-family: "Hiragino Maru Gothic ProN", "Hiragino Sans", "Yu Gothic", system-ui, -apple-system, sans-serif;
+    color: var(--ink);
+    background: #f6efe2;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 18px 16px 80px; }
+  .back-link { font-size: 12.5px; color: var(--accent-dk); text-decoration: none; }
+  .back-link:hover { text-decoration: underline; }
+  header.map { text-align: center; margin: 6px 0 14px; }
+  header.map h1 { margin: 4px 0 6px; font-size: 22px; }
+  header.map p { margin: 0; font-size: 12.5px; color: var(--ink-soft); line-height: 1.6; }
+
+  /* サマリーバー */
+  .summary {
+    position: sticky; top: 8px; z-index: 10;
+    background: var(--card); border: 2px solid #ead9bd; border-radius: 16px;
+    box-shadow: 0 4px 14px var(--shadow);
+    padding: 10px 14px; margin: 14px 0 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  }
+  .summary .s-main { font-size: 13.5px; font-weight: 700; }
+  .summary .s-main b { font-size: 18px; color: var(--bad); }
+  .summary .s-main .s-ok { color: var(--accent-dk); }
+  .summary .s-sub { font-size: 10.5px; color: var(--ink-soft); width: 100%; }
+  .summary .s-reset { background: none; border: 1px solid #ead9bd; border-radius: 10px;
+    font: inherit; font-size: 11px; color: var(--ink-soft); padding: 4px 10px; cursor: pointer; }
+  .summary .s-reset:hover { border-color: var(--accent); color: var(--accent-dk); }
+
+  /* 領域カード */
+  details.area {
+    background: var(--card); border: 2px solid #ead9bd; border-radius: 18px;
+    box-shadow: 0 4px 12px var(--shadow);
+    margin: 12px 0; padding: 0 16px;
+  }
+  details.area > summary {
+    list-style: none; cursor: pointer; padding: 14px 2px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 15px; font-weight: 700;
+  }
+  details.area > summary::-webkit-details-marker { display: none; }
+  details.area > summary .a-emoji { font-size: 20px; }
+  details.area > summary .a-chip {
+    margin-left: auto; font-size: 11px; font-weight: 700; white-space: nowrap;
+    padding: 3px 10px; border-radius: 10px; background: #f0e7d4; color: var(--ink-soft);
+  }
+  details.area > summary .a-chip.hit { background: #f7ddcb; color: var(--bad); }
+  details.area > summary .a-chip.clear { background: #e7f3e2; color: var(--accent-dk); }
+  details.area > summary .a-arrow { color: var(--ink-soft); font-size: 12px; transition: transform .15s; }
+  details.area[open] > summary .a-arrow { transform: rotate(90deg); }
+  details.area .a-body { padding: 2px 2px 16px; border-top: 1px dashed #ecdfc8; }
+  .a-lead { font-size: 12.5px; color: var(--ink-soft); line-height: 1.65; margin: 10px 0; }
+  .a-lead b { color: var(--ink); }
+  h3.sec { margin: 16px 0 6px; font-size: 13.5px; color: var(--accent-dk); }
+
+  /* 比較表 */
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 6px 0; }
+  .cmp-table th, .cmp-table td { padding: 7px 6px; text-align: left; border-bottom: 1px solid #ecdfc8; vertical-align: top; }
+  .cmp-table th { font-size: 10.5px; color: var(--ink-soft); font-weight: 700; }
+  .cmp-table td:first-child { font-weight: 700; }
+  .cmp-table .sub { display: block; font-size: 10px; font-weight: 400; color: var(--ink-soft); opacity: .85; margin-top: 1px; }
+  .cmp-table tr.best td { background: #eef7ea; }
+  .cmp-table tr.best td:first-child { border-left: 3px solid var(--accent); }
+  .cmp-table tr.worst td { background: #fbeee4; }
+  .cmp-table tr.worst td:first-child { border-left: 3px solid var(--bad); }
+  .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tbl-scroll .cmp-table { min-width: 480px; }
+
+  /* 選び方ボックス */
+  .howto { background: #fbf6ec; border-radius: 12px; padding: 10px 12px; font-size: 12px;
+    color: var(--ink-soft); line-height: 1.65; margin: 8px 0; }
+  .howto b { color: var(--accent-dk); }
+
+  /* チェック項目 */
+  .checks { margin-top: 14px; }
+  .check {
+    border: 1.5px solid #ead9bd; border-radius: 14px; padding: 10px 12px; margin: 8px 0;
+    background: #fffdf8;
+  }
+  .check.hit { border-color: #e0b490; background: #fdf4ec; }
+  .check.clear { border-color: #bcd9b4; }
+  .check .q { font-size: 13px; font-weight: 700; line-height: 1.5; }
+  .check .loss { margin-top: 5px; font-size: 11.5px; color: var(--bad); font-weight: 700; }
+  .check .loss .basis { display: block; font-weight: 400; font-size: 10.5px; color: var(--ink-soft); margin-top: 1px; }
+  .check .fix { margin-top: 4px; font-size: 11.5px; color: var(--accent-dk); }
+  .check .btns { display: flex; gap: 8px; margin-top: 8px; }
+  .check .btns button {
+    flex: 1; max-width: 120px; border: 1.5px solid #ead9bd; background: #fff; border-radius: 10px;
+    font: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft);
+    padding: 6px 0; cursor: pointer; transition: all .12s;
+  }
+  .check .btns button:hover { border-color: var(--accent); }
+  .check .btns button.on-yes { background: #f7ddcb; border-color: var(--bad); color: var(--bad); }
+  .check .btns button.on-no { background: #e7f3e2; border-color: var(--accent); color: var(--accent-dk); }
+
+  .allclear { text-align: center; font-size: 14px; font-weight: 700; color: var(--accent-dk);
+    background: #e7f3e2; border-radius: 14px; padding: 12px; margin: 14px 0; }
+  .foot-note { font-size: 10.5px; color: var(--ink-soft); opacity: .85; line-height: 1.6; margin-top: 18px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back-link" href="index.html">← おかねの木へ</a>
+  <header class="map">
+    <h1>💡 おかねの機会損失マップ</h1>
+    <p>知らないだけで損している選択はないか。<br>サラリーマンのお金の置き方を、4つの領域でチェックします。</p>
+  </header>
+
+  <div class="summary" id="summaryBar">
+    <div class="s-main" id="sumMain">チェックを始めよう</div>
+    <button type="button" class="s-reset" id="resetChecks">↺ リセット</button>
+    <div class="s-sub" id="sumSub">各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。</div>
+  </div>
+
+  <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
+
+  <!-- ① 足元に置いておくお金 -->
+  <details class="area" data-area="cash">
+    <summary><span class="a-emoji">🏦</span>① 足元に置いておくお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead"><b>量の目安は「生活費の3ヶ月分＋3年以内に使う大きな出費」。</b>それ以上の現金は寝かせるほど機会損失。そして同じ現金でも、<b>どこに置くかで利息が数十倍</b>違います。</p>
+
+      <h3 class="sec">置き場所の比較（金利は2026年時点の目安）</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>置き場所</th><th>金利(年)</th><th>引き出し</th><th>向くお金</th></tr></thead>
+        <tbody>
+          <tr class="worst"><td>普通預金<span class="sub">大手銀行</span></td><td>0.02〜0.1%</td><td>いつでも</td><td>日常の出し入れ（多く置きすぎない）</td></tr>
+          <tr class="best"><td>優遇金利の口座<span class="sub">ネット銀行・証券連携</span></td><td>0.1〜0.3%</td><td>いつでも</td><td>生活防衛資金の基本形</td></tr>
+          <tr><td>定期預金<span class="sub">満期まで固定</span></td><td>0.1〜0.5%</td><td>満期まで原則固定</td><td>1〜3年使わないと決めたお金</td></tr>
+          <tr><td>金銭信託<span class="sub">信託銀行</span></td><td>0.2〜0.5%</td><td>期間満了まで</td><td>まとまった当面使わないお金</td></tr>
+          <tr><td>MRF<span class="sub">証券口座の待機資金</span></td><td>〜0.1%前後</td><td>すぐ買付に回せる</td><td>投資の待機資金</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>使う時期の近さで置き分けるのが基本。すぐ使う→優遇金利の普通預金／使わないと決めた分→定期・金銭信託／投資に回す分→MRF。</div>
+
+      <div class="checks" data-checks="cash"></div>
+    </div>
+  </details>
+
+  <!-- ② お金が必要な時の選択肢 -->
+  <details class="area" data-area="borrow">
+    <summary><span class="a-emoji">🆘</span>② お金が急に必要な時<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead">急な出費のとき、どう工面するかで<b>総コストが桁違い</b>になります。慌てて選ぶ前に、選択肢を全部知っておくこと自体が備えです。</p>
+
+      <h3 class="sec">5つの選択肢のプロコン（金利は目安）</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>方法</th><th>コスト(年)</th><th>強み</th><th>弱み</th></tr></thead>
+        <tbody>
+          <tr><td>親・家族に借りる</td><td>0%</td><td>コストなし・早い</td><td>心理的負担・関係リスク</td></tr>
+          <tr class="worst"><td>サラ金・カードローン<span class="sub">リボ払い含む</span></td><td>15〜18%</td><td>即日・手軽</td><td>圧倒的高金利。常習化しやすい</td></tr>
+          <tr><td>投資商品を売る</td><td>利益に約20%課税</td><td>借金にならない</td><td>複利が止まる・木を切る行為</td></tr>
+          <tr><td>銀行ローン<span class="sub">フリー/目的別</span></td><td>2〜14%</td><td>まとまった額に対応</td><td>審査に日数・使途制限あり</td></tr>
+          <tr class="best"><td>有価証券担保ローン<span class="sub">証券担保・株担保</span></td><td>2〜4%</td><td>売らずに現金化＝複利継続・課税なし</td><td>証券口座と担保余力が必要</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>総コスト順に検討。①家族 → ②担保ローン（投資を持っているなら）→ ③銀行ローン → ④売却（含み益が小さいものから）→ サラ金は最後の手段にしない設計を。</div>
+
+      <div class="checks" data-checks="borrow"></div>
+    </div>
+  </details>
+
+  <!-- ③ フリーマネー -->
+  <details class="area" data-area="free">
+    <summary><span class="a-emoji">🎁</span>③ もらい忘れているお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead">会社や国が「使ってくれたら上乗せします」と用意しているお金。<b>申請しないだけで消えている</b>、いちばん確実なリターンです。</p>
+
+      <h3 class="sec">代表的なフリーマネー</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>制度</th><th>もらえる目安</th><th>確認先</th></tr></thead>
+        <tbody>
+          <tr class="best"><td>職場つみたてNISA 奨励金</td><td>拠出額の5〜20%上乗せ</td><td>人事・総務ポータル</td></tr>
+          <tr class="best"><td>持株会 奨励金</td><td>拠出額の5〜15%上乗せ<span class="sub">※1銘柄集中には注意（④参照）</span></td><td>人事・総務ポータル</td></tr>
+          <tr><td>企業型DC・マッチング拠出</td><td>掛金が全額所得控除</td><td>人事・総務ポータル</td></tr>
+          <tr><td>iDeCo</td><td>掛金が全額所得控除</td><td>証券会社</td></tr>
+          <tr><td>ふるさと納税</td><td>実質2,000円で返礼品（寄付額の約3割）</td><td>ポータルサイト</td></tr>
+          <tr><td>国・自治体の補助金/給付</td><td>住宅・子育て・省エネ等 数万〜百万円台</td><td>自治体サイト・ミラサポ等</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>まず<b>会社の制度から</b>（奨励金は即・確定リターン）。次に税優遇（DC/iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
+
+      <div class="checks" data-checks="free"></div>
+    </div>
+  </details>
+
+  <!-- ④ 投資の選択肢とコスト -->
+  <details class="area" data-area="invest">
+    <summary><span class="a-emoji">🌳</span>④ 投資の選択肢とコスト<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead">同じ「投資している」でも、<b>集中しすぎ・コスト高すぎ</b>は静かな機会損失。選択肢の全体像とコストを知っておきましょう。</p>
+
+      <h3 class="sec">選択肢の比較（コストは信託報酬等の年率目安）</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>選択肢</th><th>コスト(年)</th><th>分散</th><th>手間</th><th>向く人</th></tr></thead>
+        <tbody>
+          <tr class="worst"><td>持ち株会のみ</td><td>ほぼ0%<span class="sub">奨励金は魅力</span></td><td>×1銘柄＝会社と運命共同体</td><td>なし</td><td>奨励金分だけ活用が吉</td></tr>
+          <tr><td>個別株</td><td>売買手数料のみ</td><td>△ 自分次第</td><td>大</td><td>企業分析が好きな人</td></tr>
+          <tr><td>債券・国債</td><td>ほぼ0〜0.2%</td><td>○</td><td>小</td><td>守りを固めたい人</td></tr>
+          <tr class="best"><td>インデックス投信<span class="sub">全世界株など</span></td><td>0.05〜0.2%</td><td>◎ 数千銘柄</td><td>小</td><td>迷ったらまずこれ</td></tr>
+          <tr><td>アクティブ投信</td><td>1〜2%</td><td>○</td><td>小</td><td>高コストに見合うかの見極めが必要</td></tr>
+          <tr><td>バランス型ファンド</td><td>0.1〜0.5%</td><td>◎ 株+債券等</td><td>ほぼ0</td><td>配分の調整まで任せたい人</td></tr>
+          <tr><td>ターゲットデートファンド</td><td>0.3〜0.7%</td><td>◎</td><td>ほぼ0</td><td>年齢に合わせる調整まで任せたい人</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>軸は<b>低コスト×分散</b>（インデックス投信）。自分で調整したくないならバランス型／ターゲットデート。持ち株会は奨励金の範囲でほどほどに。コスト1%の差は30年で資産の2〜3割の差になります。</div>
+
+      <div class="checks" data-checks="invest"></div>
+    </div>
+  </details>
+
+  <p class="foot-note">※ 金利・コスト・概算額は代表的な目安（2026年時点）。実際は金融機関・商品・制度により異なります。<br>このページは教育目的のプロトタイプで、特定商品の勧誘ではありません。</p>
+</div>
+
+<script>
+/* =========================================================================
+   機会損失チェックリスト
+   loss: 年間の概算損失額（円）を返す関数（前提は basis に明記）
+   ========================================================================= */
+const CHECKS = [
+  // ① 足元のお金
+  { id: "cash-bigbank", area: "cash",
+    q: "生活防衛資金を、大手銀行の普通預金（金利ほぼゼロ）に置いている",
+    loss: 2700, basis: "100万円 ×（優遇0.29% − 大手0.02%）で試算",
+    fix: "ネット銀行や証券連携の優遇金利口座へ移すだけで、リスクゼロで利息が数十倍に。" },
+  { id: "cash-toomuch", area: "cash",
+    q: "生活費3ヶ月分＋目先の出費よりも、明らかに多い現金を普通預金に寝かせている",
+    loss: 50000, basis: "余剰100万円 ×（長期投資の期待5% − 0.02%）で試算",
+    fix: "余剰分は積立投資へ。「おかねの木」の①で余力を確認できます。" },
+  { id: "cash-unknown", area: "cash",
+    q: "「優遇金利口座」や「MRF」という選択肢を、今日まで知らなかった",
+    loss: 0, basis: "知らない選択肢は選べない（金額は上の2項目で計上）",
+    fix: "上の比較表を保存して、次の給料日にまず置き場所から見直しを。" },
+
+  // ② お金が必要な時
+  { id: "borrow-sarakin", area: "borrow",
+    q: "急な出費を、カードローン・リボ払い・サラ金で乗り切ったことがある",
+    loss: 45000, basis: "30万円を年18%で1年借りた場合 vs 担保ローン3%（差15%）",
+    fix: "投資資産があれば有価証券担保ローン（2〜4%）、なければ銀行ローンを先に検討。" },
+  { id: "borrow-selltax", area: "borrow",
+    q: "投資商品を売って現金化すると、利益の約20%が税金で引かれると知らなかった",
+    loss: 20000, basis: "含み益10万円分を売却した場合の課税の目安",
+    fix: "売る前に「借りて済ませて複利を続ける」選択肢と総コストを比較する習慣を。" },
+  { id: "borrow-tanpo", area: "borrow",
+    q: "「有価証券担保ローン」という選択肢を知らなかった",
+    loss: 0, basis: "知らない選択肢は選べない（金額は上の項目で計上）",
+    fix: "証券口座の担保余力を一度確認しておくと、いざという時に慌てません。" },
+
+  // ③ フリーマネー
+  { id: "free-shourei", area: "free",
+    q: "会社の「職場つみたてNISA」「持株会」の奨励金があるか、確認したことがない",
+    loss: 12000, basis: "月1万円拠出 × 奨励金10% × 12ヶ月で試算",
+    fix: "人事・総務ポータルで5分で確認できます。奨励金は即・確定リターン。" },
+  { id: "free-dc", area: "free",
+    q: "企業型DCのマッチング拠出やiDeCoを使っていない（使えるのに）",
+    loss: 36000, basis: "月1万円拠出 × 所得税+住民税30%の控除で試算",
+    fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
+  { id: "free-furusato", area: "free",
+    q: "ふるさと納税をしていない",
+    loss: 28000, basis: "年収600万円の上限目安 約7.7万円 × 返礼品3割 − 2,000円",
+    fix: "ポータルサイトでシミュレーション→上限内で寄付するだけ。" },
+  { id: "free-hojo", area: "free",
+    q: "引越し・出産・リフォームなどの時に、補助金を検索する習慣がない",
+    loss: 0, basis: "単発・条件次第のため合計には入れず（数万〜百万円台のことも）",
+    fix: "ライフイベントのたびに「自治体名 + 補助金」で検索を習慣に。" },
+
+  // ④ 投資の選択肢
+  { id: "invest-mochikabu", area: "invest",
+    q: "投資が「持ち株会だけ」「1銘柄だけ」になっている",
+    loss: 0, basis: "損失は確率的（会社の不調と資産が連動する集中リスク）",
+    fix: "給料も資産も同じ会社に依存する状態。奨励金分は活かしつつ、インデックスへ分散を。" },
+  { id: "invest-active", area: "invest",
+    q: "信託報酬1%超のアクティブ投信やバランスファンドを、比較せずに長期保有している",
+    loss: 14000, basis: "残高100万円 ×（1.5% − インデックス0.1%）で試算",
+    fix: "同じ中身の低コスト投信がないか一度比較を。コスト差は毎年確実に効きます。" },
+  { id: "invest-nothing", area: "invest",
+    q: "現金以外の資産を持っていない（投資をまだ始めていない）",
+    loss: 50000, basis: "100万円 ×（長期期待5% − 預金0.02%）で試算",
+    fix: "まずは少額からインデックス投信の積立を。「おかねの木」で育ち方を体験できます。" },
+];
+
+const $ = id => document.getElementById(id);
+const LS_KEY = "okane_map_checks";
+let answers = {};
+try { answers = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) { answers = {}; }
+const saveAnswers = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(answers)); } catch (e) {} };
+
+const yen = v => v >= 10000 ? `約${(v/10000).toLocaleString(undefined,{maximumFractionDigits:1})}万円` : `約${v.toLocaleString()}円`;
+
+function buildChecks() {
+  document.querySelectorAll("[data-checks]").forEach(host => {
+    const area = host.getAttribute("data-checks");
+    host.innerHTML = CHECKS.filter(c => c.area === area).map(c => `
+      <div class="check" data-id="${c.id}">
+        <div class="q">${c.q}</div>
+        <div class="loss" hidden>💸 機会損失 ${c.loss > 0 ? `${yen(c.loss)}/年（概算）` : "あり"}<span class="basis">${c.basis}</span></div>
+        <div class="fix" hidden>→ ${c.fix}</div>
+        <div class="btns">
+          <button type="button" data-ans="yes">はい</button>
+          <button type="button" data-ans="no">いいえ</button>
+        </div>
+      </div>`).join("");
+  });
+  document.querySelectorAll(".check .btns button").forEach(btn =>
+    btn.addEventListener("click", () => {
+      const id = btn.closest(".check").getAttribute("data-id");
+      answers[id] = btn.getAttribute("data-ans");
+      saveAnswers();
+      renderChecks();
+    }));
+}
+
+function renderChecks() {
+  // 各チェックの見た目
+  document.querySelectorAll(".check").forEach(el => {
+    const id = el.getAttribute("data-id");
+    const ans = answers[id];
+    el.classList.toggle("hit", ans === "yes");
+    el.classList.toggle("clear", ans === "no");
+    el.querySelector(".loss").hidden = ans !== "yes";
+    el.querySelector(".fix").hidden = ans !== "yes";
+    el.querySelector('[data-ans="yes"]').classList.toggle("on-yes", ans === "yes");
+    el.querySelector('[data-ans="no"]').classList.toggle("on-no", ans === "no");
+  });
+  // 領域チップ
+  document.querySelectorAll("details.area").forEach(d => {
+    const area = d.getAttribute("data-area");
+    const list = CHECKS.filter(c => c.area === area);
+    const answered = list.filter(c => answers[c.id]);
+    const hits = list.filter(c => answers[c.id] === "yes");
+    const chip = d.querySelector("[data-chip]");
+    if (!answered.length) { chip.textContent = "未チェック"; chip.className = "a-chip"; }
+    else if (hits.length) { chip.textContent = `損失 ${hits.length}件`; chip.className = "a-chip hit"; }
+    else if (answered.length === list.length) { chip.textContent = "✓ 問題なし"; chip.className = "a-chip clear"; }
+    else { chip.textContent = `残り${list.length - answered.length}問`; chip.className = "a-chip"; }
+  });
+  // サマリー
+  const answered = CHECKS.filter(c => answers[c.id]);
+  const hits = CHECKS.filter(c => answers[c.id] === "yes");
+  const total = hits.reduce((a, c) => a + c.loss, 0);
+  const sumMain = $("sumMain"), sumSub = $("sumSub");
+  if (!answered.length) {
+    sumMain.textContent = "チェックを始めよう";
+    sumSub.textContent = "各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。";
+  } else if (hits.length) {
+    sumMain.innerHTML = `見つかった機会損失 <b>${hits.length}件</b>${total > 0 ? `・合計 <b>${yen(total)}</b>/年` : ""}`;
+    sumSub.textContent = `※ざっくり概算です。前提は各項目に記載（回答 ${answered.length}/${CHECKS.length}問）`;
+  } else {
+    sumMain.innerHTML = `<span class="s-ok">機会損失 0件</span>（回答 ${answered.length}/${CHECKS.length}問）`;
+    sumSub.textContent = answered.length === CHECKS.length ? "すべて確認済みです。" : "この調子で残りもチェックしてみましょう。";
+  }
+  $("allClear").hidden = !(answered.length === CHECKS.length && hits.length === 0);
+}
+
+$("resetChecks").addEventListener("click", () => {
+  answers = {};
+  saveAnswers();
+  renderChecks();
+});
+
+buildChecks();
+renderChecks();
+</script>
+</body>
+</html>

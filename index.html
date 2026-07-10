@@ -40,6 +40,9 @@
     letter-spacing: 0.06em;
   }
   header.app p { margin: 0; color: var(--ink-soft); font-size: 13px; }
+  header.app .map-link { font-size: 12px; color: var(--accent-dk); text-decoration: none;
+    border: 1px solid #e3d4b6; border-radius: 12px; padding: 2px 10px; background: #fffdf8; }
+  header.app .map-link:hover { border-color: var(--accent); }
 
   /* developer-only profile switcher (ページ最下部) */
   .dev-switcher {
@@ -472,6 +475,7 @@
 <div class="wrap">
   <header class="app">
     <h1>🌳 おかねの木</h1>
+    <a class="map-link" href="map.html">💡 機会損失マップ</a>
   </header>
 
   <div class="layout">
