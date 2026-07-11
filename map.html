@@ -45,6 +45,24 @@
   .summary .s-reset { background: none; border: 1px solid #ead9bd; border-radius: 10px;
     font: inherit; font-size: 11px; color: var(--ink-soft); padding: 4px 10px; cursor: pointer; }
   .summary .s-reset:hover { border-color: var(--accent); color: var(--accent-dk); }
+  .summary .s-compound { width: 100%; font-size: 12px; line-height: 1.55; color: var(--ink);
+    background: #fbf6ec; border-radius: 10px; padding: 7px 10px; }
+  .summary .s-compound b { color: var(--bad); font-size: 14px; }
+  .summary .s-compound a { color: var(--accent-dk); }
+
+  /* あなたの前提 */
+  .profile-card { background: var(--card); border: 2px solid #ead9bd; border-radius: 16px;
+    margin: 0 0 14px; padding: 0 14px; box-shadow: 0 3px 10px var(--shadow); }
+  .profile-card > summary { list-style: none; cursor: pointer; padding: 11px 2px;
+    font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .profile-card > summary::-webkit-details-marker { display: none; }
+  .profile-card .p-hint { font-size: 10.5px; font-weight: 400; color: var(--ink-soft); }
+  .profile-card .p-body { border-top: 1px dashed #ecdfc8; padding: 10px 2px 12px; }
+  .profile-card label { display: flex; align-items: center; gap: 8px; font-size: 13px; margin: 6px 0; }
+  .profile-card input[type="number"] { width: 92px; padding: 6px 8px; border: 1.5px solid #ead9bd;
+    border-radius: 9px; font: inherit; font-size: 13px; text-align: right; background: #fff; }
+  .profile-card input:focus { outline: none; border-color: var(--accent); }
+  .profile-card .p-note { margin: 8px 0 0; font-size: 11px; color: var(--ink-soft); }
 
   /* 領域カード */
   details.area {
@@ -129,7 +147,19 @@
     <div class="s-main" id="sumMain">チェックを始めよう</div>
     <button type="button" class="s-reset" id="resetChecks">↺ リセット</button>
     <div class="s-sub" id="sumSub">各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。</div>
+    <div class="s-compound" id="sumCompound" hidden></div>
   </div>
+
+  <!-- あなたの前提（入れると概算が自分の数字になる） -->
+  <details class="profile-card" id="profileCard">
+    <summary>🙋 あなたの前提を入れる<span class="p-hint">※入れなくても代表値で概算します</span></summary>
+    <div class="p-body">
+      <label>年収 <input type="number" id="pIncome" min="100" max="3000" step="10"> 万円</label>
+      <label>預貯金額 <input type="number" id="pSavings" min="0" max="10000" step="10"> 万円</label>
+      <label>毎月の積立額 <input type="number" id="pMonthly" min="0" max="50" step="0.5"> 万円</label>
+      <p class="p-note">入力すると、下の各チェックの損失概算が「あなたの数字」で再計算されます。</p>
+    </div>
+  </details>
 
   <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
 
@@ -234,77 +264,107 @@
 <script>
 /* =========================================================================
    機会損失チェックリスト
-   loss: 年間の概算損失額（円）を返す関数（前提は basis に明記）
+   loss(p)/basis(p): あなたの前提 p = { income, savings, monthly }（円）から
+   年間の概算損失額と前提文言を計算する。0 を返す項目は合計に入れない。
    ========================================================================= */
+const man = v => (v / 10000).toLocaleString(undefined, { maximumFractionDigits: 0 });
+
 const CHECKS = [
   // ① 足元のお金
   { id: "cash-bigbank", area: "cash",
     q: "生活防衛資金を、大手銀行の普通預金（金利ほぼゼロ）に置いている",
-    loss: 2700, basis: "100万円 ×（優遇0.29% − 大手0.02%）で試算",
+    loss: p => p.savings * 0.0027,
+    basis: p => `あなたの預貯金${man(p.savings)}万円 ×（優遇0.29% − 大手0.02%）で試算`,
     fix: "ネット銀行や証券連携の優遇金利口座へ移すだけで、リスクゼロで利息が数十倍に。" },
   { id: "cash-toomuch", area: "cash",
     q: "生活費3ヶ月分＋目先の出費よりも、明らかに多い現金を普通預金に寝かせている",
-    loss: 50000, basis: "余剰100万円 ×（長期投資の期待5% − 0.02%）で試算",
+    loss: p => Math.max(0, p.savings - emergencyCash(p)) * 0.0498,
+    basis: p => {
+      const sur = Math.max(0, p.savings - emergencyCash(p));
+      return sur > 0
+        ? `余剰${man(sur)}万円（預貯金 − 生活費3ヶ月目安${man(emergencyCash(p))}万円）×（長期期待5% − 0.02%）で試算`
+        : `預貯金が生活費3ヶ月目安（${man(emergencyCash(p))}万円）以下のため余剰なし`;
+    },
     fix: "余剰分は積立投資へ。「おかねの木」の①で余力を確認できます。" },
   { id: "cash-unknown", area: "cash",
     q: "「優遇金利口座」や「MRF」という選択肢を、今日まで知らなかった",
-    loss: 0, basis: "知らない選択肢は選べない（金額は上の2項目で計上）",
+    loss: () => 0, basis: () => "知らない選択肢は選べない（金額は上の2項目で計上）",
     fix: "上の比較表を保存して、次の給料日にまず置き場所から見直しを。" },
 
   // ② お金が必要な時
   { id: "borrow-sarakin", area: "borrow",
     q: "急な出費を、カードローン・リボ払い・サラ金で乗り切ったことがある",
-    loss: 45000, basis: "30万円を年18%で1年借りた場合 vs 担保ローン3%（差15%）",
+    loss: () => 45000, basis: () => "30万円を年18%で1年借りた場合 vs 担保ローン3%（差15%）",
     fix: "投資資産があれば有価証券担保ローン（2〜4%）、なければ銀行ローンを先に検討。" },
   { id: "borrow-selltax", area: "borrow",
     q: "投資商品を売って現金化すると、利益の約20%が税金で引かれると知らなかった",
-    loss: 20000, basis: "含み益10万円分を売却した場合の課税の目安",
+    loss: () => 20000, basis: () => "含み益10万円分を売却した場合の課税の目安",
     fix: "売る前に「借りて済ませて複利を続ける」選択肢と総コストを比較する習慣を。" },
   { id: "borrow-tanpo", area: "borrow",
     q: "「有価証券担保ローン」という選択肢を知らなかった",
-    loss: 0, basis: "知らない選択肢は選べない（金額は上の項目で計上）",
+    loss: () => 0, basis: () => "知らない選択肢は選べない（金額は上の項目で計上）",
     fix: "証券口座の担保余力を一度確認しておくと、いざという時に慌てません。" },
 
   // ③ フリーマネー
   { id: "free-shourei", area: "free",
     q: "会社の「職場つみたてNISA」「持株会」の奨励金があるか、確認したことがない",
-    loss: 12000, basis: "月1万円拠出 × 奨励金10% × 12ヶ月で試算",
+    loss: p => p.monthly * 0.10 * 12,
+    basis: p => `あなたの積立 月${man10(p.monthly)}万円 × 奨励金10% × 12ヶ月で試算`,
     fix: "人事・総務ポータルで5分で確認できます。奨励金は即・確定リターン。" },
   { id: "free-dc", area: "free",
     q: "企業型DCのマッチング拠出やiDeCoを使っていない（使えるのに）",
-    loss: 36000, basis: "月1万円拠出 × 所得税+住民税30%の控除で試算",
+    loss: p => Math.min(p.monthly, 20000) * 0.30 * 12,
+    basis: p => `月${man10(Math.min(p.monthly, 20000))}万円の拠出 × 所得税+住民税30%の控除で試算`,
     fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
   { id: "free-furusato", area: "free",
     q: "ふるさと納税をしていない",
-    loss: 28000, basis: "年収600万円の上限目安 約7.7万円 × 返礼品3割 − 2,000円",
+    loss: p => Math.max(0, Math.round(p.income / 6000000 * 28000)),
+    basis: p => `年収${man(p.income)}万円の上限目安 × 返礼品3割 − 2,000円`,
     fix: "ポータルサイトでシミュレーション→上限内で寄付するだけ。" },
   { id: "free-hojo", area: "free",
     q: "引越し・出産・リフォームなどの時に、補助金を検索する習慣がない",
-    loss: 0, basis: "単発・条件次第のため合計には入れず（数万〜百万円台のことも）",
+    loss: () => 0, basis: () => "単発・条件次第のため合計には入れず（数万〜百万円台のことも）",
     fix: "ライフイベントのたびに「自治体名 + 補助金」で検索を習慣に。" },
 
   // ④ 投資の選択肢
   { id: "invest-mochikabu", area: "invest",
     q: "投資が「持ち株会だけ」「1銘柄だけ」になっている",
-    loss: 0, basis: "損失は確率的（会社の不調と資産が連動する集中リスク）",
+    loss: () => 0, basis: () => "損失は確率的（会社の不調と資産が連動する集中リスク）",
     fix: "給料も資産も同じ会社に依存する状態。奨励金分は活かしつつ、インデックスへ分散を。" },
   { id: "invest-active", area: "invest",
     q: "信託報酬1%超のアクティブ投信やバランスファンドを、比較せずに長期保有している",
-    loss: 14000, basis: "残高100万円 ×（1.5% − インデックス0.1%）で試算",
+    loss: p => p.savings * 0.014,
+    basis: p => `投資残高を預貯金と同程度（${man(p.savings)}万円）と仮定 ×（1.5% − インデックス0.1%）で試算`,
     fix: "同じ中身の低コスト投信がないか一度比較を。コスト差は毎年確実に効きます。" },
   { id: "invest-nothing", area: "invest",
     q: "現金以外の資産を持っていない（投資をまだ始めていない）",
-    loss: 50000, basis: "100万円 ×（長期期待5% − 預金0.02%）で試算",
+    loss: p => p.savings * 0.0498,
+    basis: p => `あなたの預貯金${man(p.savings)}万円 ×（長期期待5% − 預金0.02%）で試算`,
     fix: "まずは少額からインデックス投信の積立を。「おかねの木」で育ち方を体験できます。" },
 ];
 
+// 生活費3ヶ月分の目安：手取りを年収の6割とみなした月額 × 3
+const emergencyCash = p => (p.income / 12) * 0.6 * 3;
+const man10 = v => (v / 10000).toLocaleString(undefined, { maximumFractionDigits: 1 });
+
 const $ = id => document.getElementById(id);
 const LS_KEY = "okane_map_checks";
+const LS_PROFILE = "okane_map_profile";
 let answers = {};
 try { answers = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) { answers = {}; }
 const saveAnswers = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(answers)); } catch (e) {} };
 
-const yen = v => v >= 10000 ? `約${(v/10000).toLocaleString(undefined,{maximumFractionDigits:1})}万円` : `約${v.toLocaleString()}円`;
+// あなたの前提（万円で保持、計算時に円へ）。既定は代表値。
+let profile = { incomeMan: 600, savingsMan: 300, monthlyMan: 3 };
+try { profile = { ...profile, ...JSON.parse(localStorage.getItem(LS_PROFILE) || "{}") }; } catch (e) {}
+const saveProfile = () => { try { localStorage.setItem(LS_PROFILE, JSON.stringify(profile)); } catch (e) {} };
+const profileYen = () => ({
+  income: (profile.incomeMan || 600) * 10000,
+  savings: (profile.savingsMan || 0) * 10000,
+  monthly: (profile.monthlyMan || 0) * 10000,
+});
+
+const yen = v => v >= 10000 ? `約${(v/10000).toLocaleString(undefined,{maximumFractionDigits:1})}万円` : `約${Math.round(v).toLocaleString()}円`;
 
 function buildChecks() {
   document.querySelectorAll("[data-checks]").forEach(host => {
@@ -312,7 +372,7 @@ function buildChecks() {
     host.innerHTML = CHECKS.filter(c => c.area === area).map(c => `
       <div class="check" data-id="${c.id}">
         <div class="q">${c.q}</div>
-        <div class="loss" hidden>💸 機会損失 ${c.loss > 0 ? `${yen(c.loss)}/年（概算）` : "あり"}<span class="basis">${c.basis}</span></div>
+        <div class="loss" hidden></div>
         <div class="fix" hidden>→ ${c.fix}</div>
         <div class="btns">
           <button type="button" data-ans="yes">はい</button>
@@ -330,13 +390,19 @@ function buildChecks() {
 }
 
 function renderChecks() {
-  // 各チェックの見た目
+  const p = profileYen();
+  const lossOf = c => Math.round(c.loss(p));
+  // 各チェックの見た目（損失概算は「あなたの前提」で毎回再計算）
   document.querySelectorAll(".check").forEach(el => {
     const id = el.getAttribute("data-id");
+    const c = CHECKS.find(x => x.id === id);
     const ans = answers[id];
     el.classList.toggle("hit", ans === "yes");
     el.classList.toggle("clear", ans === "no");
-    el.querySelector(".loss").hidden = ans !== "yes";
+    const lossEl = el.querySelector(".loss");
+    const lv = lossOf(c);
+    lossEl.innerHTML = `💸 機会損失 ${lv > 0 ? `${yen(lv)}/年（概算）` : "あり"}<span class="basis">${c.basis(p)}</span>`;
+    lossEl.hidden = ans !== "yes";
     el.querySelector(".fix").hidden = ans !== "yes";
     el.querySelector('[data-ans="yes"]').classList.toggle("on-yes", ans === "yes");
     el.querySelector('[data-ans="no"]').classList.toggle("on-no", ans === "no");
@@ -356,8 +422,8 @@ function renderChecks() {
   // サマリー
   const answered = CHECKS.filter(c => answers[c.id]);
   const hits = CHECKS.filter(c => answers[c.id] === "yes");
-  const total = hits.reduce((a, c) => a + c.loss, 0);
-  const sumMain = $("sumMain"), sumSub = $("sumSub");
+  const total = hits.reduce((a, c) => a + lossOf(c), 0);
+  const sumMain = $("sumMain"), sumSub = $("sumSub"), sumCompound = $("sumCompound");
   if (!answered.length) {
     sumMain.textContent = "チェックを始めよう";
     sumSub.textContent = "各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。";
@@ -368,6 +434,15 @@ function renderChecks() {
     sumMain.innerHTML = `<span class="s-ok">機会損失 0件</span>（回答 ${answered.length}/${CHECKS.length}問）`;
     sumSub.textContent = answered.length === CHECKS.length ? "すべて確認済みです。" : "この調子で残りもチェックしてみましょう。";
   }
+  // 30年複利換算：年間の取りこぼしを毎年5%で再投資し続けた場合の差
+  if (hits.length && total > 0) {
+    const future = total * ((Math.pow(1.05, 30) - 1) / 0.05);   // ≈ total × 66.4
+    sumCompound.innerHTML = `このまま30年つづくと <b>${yen(future)}</b> の差（年5%で再投資した場合）<br>` +
+      `🌳 この分だけ、あなたの木は小さく育ちます。<a href="index.html">おかねの木で見る</a>`;
+    sumCompound.hidden = false;
+  } else {
+    sumCompound.hidden = true;
+  }
   $("allClear").hidden = !(answered.length === CHECKS.length && hits.length === 0);
 }
 
@@ -377,6 +452,20 @@ $("resetChecks").addEventListener("click", () => {
   renderChecks();
 });
 
+// あなたの前提の入力 → 保存して全概算を再計算
+function syncProfileInputs() {
+  $("pIncome").value = profile.incomeMan;
+  $("pSavings").value = profile.savingsMan;
+  $("pMonthly").value = profile.monthlyMan;
+}
+[["pIncome", "incomeMan"], ["pSavings", "savingsMan"], ["pMonthly", "monthlyMan"]].forEach(([id, key]) => {
+  $(id).addEventListener("input", e => {
+    const v = parseFloat(e.target.value);
+    if (!isNaN(v) && v >= 0) { profile[key] = v; saveProfile(); renderChecks(); }
+  });
+});
+
+syncProfileInputs();
 buildChecks();
 renderChecks();
 </script>
