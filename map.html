@@ -272,7 +272,7 @@
 
   <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
 
-  <!-- ① フリーマネー（強い動機づくり：もらえるお金から始める） -->
+  <!-- ① フリーマネー（もらえるお金から始める） -->
   <details class="area" data-area="free">
     <summary><span class="a-emoji">🎁</span>① もらい忘れているお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
@@ -312,7 +312,7 @@
   <details class="area" data-area="cash">
     <summary><span class="a-emoji">🏦</span>② 運用に回せる余裕はある？<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
-      <p class="a-lead">①でやる気が出たら、次は<b>いくらまで安心して運用に回せるか</b>。目安は「生活費の3ヶ月分＋3年以内に使う大きな出費」を現金で残し、<b>それを超える分が運用に回せる余裕</b>です。</p>
+      <p class="a-lead">運用に回してよいのは、<b>当面つかう現金を除いた分</b>だけ。目安は「生活費の3ヶ月分＋3年以内に使う大きな出費」を現金で残し、<b>それを超える分が運用に回せる余裕</b>です。</p>
 
       <!-- 余裕診断（プロフィールの数字から自動計算） -->
       <div class="margin-box" id="marginBox"></div>
@@ -338,7 +338,7 @@
   <details class="area" data-area="invest">
     <summary><span class="a-emoji">🌳</span>③ 何で運用する？（商品えらび）<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
-      <p class="a-lead">余裕がわかったら、何で運用するか。<b>集中しすぎ・コスト高すぎ</b>は静かな機会損失。2つの質問に答えると、あなたに合う型がわかります。</p>
+      <p class="a-lead">何で運用するかは、2つの質問でぐっと絞りこめます。<b>集中しすぎ・コスト高すぎ</b>は静かな機会損失です。</p>
 
       <!-- 2問で決まる商品えらび -->
       <div class="picker" id="picker">
@@ -380,7 +380,7 @@
   <details class="area" data-area="borrow">
     <summary><span class="a-emoji">🆘</span>④ お金が急に必要な時<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
-      <p class="a-lead">運用を始めたあとの「もしも」に。急な出費のとき、どう工面するかで<b>総コストが桁違い</b>になります。慌てて選ぶ前に、選択肢を全部知っておくこと自体が備えです。</p>
+      <p class="a-lead">急な出費のとき、どう工面するかで<b>総コストが桁違い</b>になります。慌てて選ぶ前に、選択肢を全部知っておくこと自体が備えです。</p>
 
       <h3 class="sec">5つの選択肢のプロコン（金利は目安）</h3>
       <div class="tbl-scroll"><table class="cmp-table">
@@ -436,7 +436,7 @@ const CHECKS = [
         ? `余剰${man(sur)}万円（預貯金 − 生活費3ヶ月目安${man(emergencyCash(p))}万円）×（長期期待5% − 0.02%）で試算`
         : `預貯金が生活費3ヶ月目安（${man(emergencyCash(p))}万円）以下のため余剰なし`;
     },
-    fix: "余剰分は積立投資へ。「おかねの木」の①で余力を確認できます。" },
+    fix: "余剰分は積立投資へ。いくらまで回せるかは、上の余裕診断が目安になります。" },
   { id: "cash-unknown", area: "cash",
     q: "「優遇金利口座」や「MRF」という選択肢を、今日まで知らなかった",
     loss: () => 0, basis: () => "知らない選択肢は選べない（金額は上の2項目で計上）",
