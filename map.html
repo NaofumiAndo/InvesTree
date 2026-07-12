@@ -84,6 +84,11 @@
   .quiz-btns button:hover { border-color: var(--accent); background: #f4faf2; }
   .quiz-btns button.skip { flex: 0 0 auto; min-width: 74px; font-size: 11.5px; color: var(--ink-soft); }
   .quiz-donemsg { margin: 10px 0 6px; font-size: 13px; font-weight: 700; line-height: 1.6; }
+  .quiz-help-btn { background: none; border: none; padding: 0; margin: -6px 0 10px;
+    font: inherit; font-size: 11.5px; color: var(--accent-dk); text-decoration: underline; cursor: pointer; }
+  .quiz-help { background: #f4faf2; border: 1.5px solid #cfe0c9; border-radius: 12px;
+    padding: 9px 12px; margin: 0 0 12px; font-size: 12px; color: var(--ink-soft); line-height: 1.65; }
+  .quiz-help a { display: block; margin-top: 4px; font-size: 11px; color: var(--accent-dk); }
   .quiz-review { margin-top: 10px; border-top: 1px dashed #ecdfc8; padding-top: 8px; }
   .quiz-review > summary { list-style: none; cursor: pointer; font-size: 11.5px; color: var(--ink-soft);
     text-decoration: underline; }
@@ -458,12 +463,14 @@ const CHECKS = [
   { id: "cash-bigbank", area: "cash",
     q: "生活防衛資金を、大手銀行の普通預金（金利ほぼゼロ）に置いている",
     act: "優遇金利の口座へ移す", certainty: 3, effortH: 0.5,
+    help: "優遇金利口座＝ネット銀行や、証券口座と連携した銀行の普通預金。大手銀行の10倍以上の金利がつくことが多く、いつでも引き出せます。",
     loss: p => p.savings * 0.0027,
     basis: p => `あなたの預貯金${man(p.savings)}万円 ×（優遇0.29% − 大手0.02%）で試算`,
     fix: "ネット銀行や証券連携の優遇金利口座へ移すだけで、リスクゼロで利息が数十倍に。" },
   { id: "cash-toomuch", area: "cash",
     q: "生活費3ヶ月分＋目先の出費よりも、明らかに多い現金を普通預金に寝かせている",
     act: "余剰現金の積立を設定する", certainty: 1, effortH: 1,
+    help: "「生活費3ヶ月分＋近々使う予定のお金」を残して、それを超える分を寝ている現金と呼んでいます。寝ている間も物価は上がるので、実質的に目減りします。",
     loss: p => Math.max(0, p.savings - emergencyCash(p)) * 0.0498,
     basis: p => {
       const sur = Math.max(0, p.savings - emergencyCash(p));
@@ -474,6 +481,7 @@ const CHECKS = [
     fix: "余剰分は積立投資へ。いくらまで回せるかは、上の余裕診断が目安になります。" },
   { id: "cash-unknown", area: "cash",
     q: "「優遇金利口座」や「MRF」という選択肢を、今日まで知らなかった",
+    help: "優遇金利口座＝金利が高めの普通預金（ネット銀行など）。MRF＝証券口座に入れたお金の自動の一時置き場。どちらも安全性は普通預金並みです。",
     loss: () => 0, basis: () => "知らない選択肢は選べない（金額は上の2項目で計上）",
     fix: "上の比較表を保存して、次の給料日にまず置き場所から見直しを。" },
 
@@ -481,14 +489,17 @@ const CHECKS = [
   { id: "borrow-sarakin", area: "borrow",
     q: "急な出費を、カードローン・リボ払い・サラ金で乗り切ったことがある",
     act: "高金利の借入を低金利へ借り換える", certainty: 2, effortH: 0.5,
+    help: "カードローン・リボ払いの利息は年15〜18%。30万円を1年借りると利息だけで4〜5万円になります。",
     loss: () => 45000, basis: () => "30万円を年18%で1年借りた場合 vs 担保ローン3%（差15%）",
     fix: "投資資産があれば有価証券担保ローン（2〜4%）、なければ銀行ローンを先に検討。" },
   { id: "borrow-selltax", area: "borrow",
     q: "投資商品を売って現金化すると、利益の約20%が税金で引かれると知らなかった",
+    help: "投資で増えた分（利益）には売却時に約20%の税金がかかります。例：100万円が110万円に増えて売ると、利益10万円のうち約2万円が引かれます。",
     loss: () => 20000, basis: () => "含み益10万円分を売却した場合の課税の目安",
     fix: "売る前に「借りて済ませて複利を続ける」選択肢と総コストを比較する習慣を。" },
   { id: "borrow-tanpo", area: "borrow",
     q: "「有価証券担保ローン」という選択肢を知らなかった",
+    help: "有価証券担保ローン＝持っている投資信託や株を担保にして、売らずにお金を借りられる仕組み。金利は年2〜4%程度と、カードローンよりずっと低めです。",
     loss: () => 0, basis: () => "知らない選択肢は選べない（金額は上の項目で計上）",
     fix: "証券口座の担保余力を一度確認しておくと、いざという時に慌てません。" },
 
@@ -496,12 +507,14 @@ const CHECKS = [
   { id: "free-shourei", area: "free",
     q: `勤務先（${COMPANY.name}）の職場つみたてNISA奨励金（拠出額の10%）を受け取っていない`,
     act: "職場つみたてNISAの奨励金を申請する", certainty: 3, effortH: 0.1,
+    help: "奨励金＝会社が積立額に上乗せしてくれるお金。例：月1万円積み立てると会社が+1,000円（10%）くれるイメージ。使わないと1円ももらえません。",
     loss: p => Math.min(p.monthly * COMPANY.nisaMatchRate, COMPANY.nisaMatchCap) * 12,
     basis: p => `${COMPANY.name}の奨励金 10%（上限 月5,000円）× あなたの積立 月${man10(p.monthly)}万円 ※人事データ連携（デモ）`,
     fix: "社内ポータルの「職場つみたてNISA」から5分で申請できます。奨励金は即・確定リターン。" },
   { id: "free-dc", area: "free",
     q: `勤務先（${COMPANY.name}）の企業型DCマッチング拠出（上限 月2万円）を使っていない`,
     act: "DCマッチング拠出を設定する", certainty: 3, effortH: 1,
+    help: "企業型DC＝会社の年金制度。マッチング拠出＝自分でも掛金を上乗せでき、その分は全額所得控除（＝税金が安くなる）。ただし60歳まで引き出せません。",
     loss: p => Math.min(p.monthly, COMPANY.dcCapMonthly) * 0.30 * 12,
     basis: p => `会社上限 月2万円までの拠出 月${man10(Math.min(p.monthly, COMPANY.dcCapMonthly))}万円 × 所得税+住民税30%の控除 ※人事データ連携（デモ）`,
     fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
@@ -509,17 +522,20 @@ const CHECKS = [
   // ④ 投資の選択肢
   { id: "invest-mochikabu", area: "invest",
     q: "投資が「持ち株会だけ」「1銘柄だけ」になっている",
+    help: "持ち株会＝自社の株を給料から積み立てる制度。1社に集中するため、会社が不調になると給料と資産が同時に傷むのが弱点です。",
     loss: () => 0, basis: () => "損失は確率的（会社の不調と資産が連動する集中リスク）",
     fix: "給料も資産も同じ会社に依存する状態。奨励金分は活かしつつ、インデックスへ分散を。" },
   { id: "invest-active", area: "invest",
     q: "信託報酬1%超のアクティブ投信やバランスファンドを、比較せずに長期保有している",
     act: "低コストのインデックス投信へ乗り換える", certainty: 2, effortH: 0.5,
+    help: "信託報酬＝投資信託を持っている間じゅう毎年引かれる手数料。アクティブ投信は年1〜2%、インデックス投信は0.1%前後が目安です。",
     loss: p => p.savings * 0.014,
     basis: p => `投資残高を預貯金と同程度（${man(p.savings)}万円）と仮定 ×（1.5% − インデックス0.1%）で試算`,
     fix: "同じ中身の低コスト投信がないか一度比較を。コスト差は毎年確実に効きます。" },
   { id: "invest-nothing", area: "invest",
     q: "現金以外の資産を持っていない（投資をまだ始めていない）",
     act: "インデックス投信の積立を開始する", certainty: 1, effortH: 1,
+    help: "インデックス投信＝市場全体をまるごと買う低コストの投資信託。世界の株式は長期で年5%程度の成長が期待されてきました（保証はありません）。",
     loss: p => p.savings * 0.0498,
     basis: p => `あなたの預貯金${man(p.savings)}万円 ×（長期期待5% − 預金0.02%）で試算`,
     fix: "まずは少額からインデックス投信の積立を。「おかねの木」で育ち方を体験できます。" },
@@ -601,14 +617,26 @@ function renderQuiz(p, lossOf) {
     body.innerHTML =
       (quizFeedback
         ? `<div class="quiz-fb ${quizFeedback.cls}">${quizFeedback.text}</div>`
-        : `<p class="quiz-lead">はい／いいえで答えるだけ。ぜんぶで約1分です。</p>`) +
+        : `<p class="quiz-lead">はい／いいえで答えるだけ。ぜんぶで約1分。わからない言葉は ❓ でその場で確認できます。</p>`) +
       `<div class="quiz-area">${AREA_LABEL[next.area]}</div>` +
       `<div class="quiz-q">${next.q}</div>` +
+      (next.help
+        ? `<button type="button" class="quiz-help-btn" id="quizHelpBtn">❓ ことばの説明</button>
+           <div class="quiz-help" id="quizHelp" hidden>${next.help}<a href="#" id="quizHelpLink">くわしくは「${AREA_LABEL[next.area]}」へ ›</a></div>`
+        : "") +
       `<div class="quiz-btns">
         <button type="button" data-qa="yes">はい</button>
         <button type="button" data-qa="no">いいえ</button>
         <button type="button" data-qa="skip" class="skip">あとで</button>
       </div>`;
+    if ($("quizHelpBtn")) {
+      $("quizHelpBtn").addEventListener("click", () => { $("quizHelp").hidden = !$("quizHelp").hidden; });
+      $("quizHelpLink").addEventListener("click", (e) => {
+        e.preventDefault();
+        const d = document.querySelector(`details.area[data-area="${next.area}"]`);
+        if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+      });
+    }
     body.querySelectorAll("[data-qa]").forEach(b => b.addEventListener("click", () => {
       if (b.dataset.qa === "skip") { quizSkip.add(next.id); quizFeedback = null; renderChecks(); return; }
       answers[next.id] = b.dataset.qa;
