@@ -64,6 +64,48 @@
   .profile-card input:focus { outline: none; border-color: var(--accent); }
   .profile-card .p-note { margin: 8px 0 0; font-size: 11px; color: var(--ink-soft); }
 
+  /* 🎯 作戦リスト */
+  .plan-card { background: var(--card); border: 2px solid #dcc9a4; border-radius: 18px;
+    margin: 0 0 16px; padding: 12px 14px 14px; box-shadow: 0 5px 16px var(--shadow); }
+  .plan-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .plan-title { font-size: 15px; font-weight: 700; }
+  .sort-toggle { display: flex; border: 1.5px solid #ead9bd; border-radius: 11px; overflow: hidden; }
+  .sort-toggle button { border: none; background: none; font: inherit; font-size: 10.5px; font-weight: 700;
+    color: var(--ink-soft); padding: 5px 9px; cursor: pointer; }
+  .sort-toggle button + button { border-left: 1px solid #ead9bd; }
+  .sort-toggle button.on { background: var(--accent); color: #fff; }
+  .plan-note { margin: 6px 0 4px; font-size: 10.5px; color: var(--ink-soft); line-height: 1.5; }
+  .tier-head { margin: 12px 0 2px; font-size: 11.5px; font-weight: 700; color: var(--accent-dk); }
+  .plan-item { display: flex; align-items: flex-start; gap: 10px;
+    border: 1.5px solid #ead9bd; border-radius: 14px; background: #fffdf8;
+    padding: 10px 12px; margin: 7px 0; }
+  .plan-item .rank { flex: 0 0 auto; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-dk); color: #fff; font-size: 12.5px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .plan-item .pi-main { flex: 1; min-width: 0; }
+  .plan-item .pi-act { font-size: 13.5px; font-weight: 700; line-height: 1.4; }
+  .plan-item .pi-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .pi-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; white-space: nowrap; }
+  .pi-badge.amt { background: #f7ddcb; color: var(--bad); }
+  .pi-badge.c3 { background: #e7f3e2; color: var(--accent-dk); }
+  .pi-badge.c2 { background: #fdeccd; color: var(--warn); }
+  .pi-badge.c1 { background: #e8e4f5; color: #6b5ea8; }
+  .pi-badge.eff { background: #f0e7d4; color: var(--ink-soft); }
+  .plan-item .pi-rate { margin-top: 4px; font-size: 11px; color: var(--accent-dk); font-weight: 700; }
+  .plan-item .done-btn { flex: 0 0 auto; align-self: center; border: 1.5px solid #ead9bd; background: #fff;
+    border-radius: 10px; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
+    padding: 7px 10px; cursor: pointer; }
+  .plan-item .done-btn:hover { border-color: var(--accent); color: var(--accent-dk); }
+  .plan-warn { margin-top: 10px; font-size: 11.5px; color: var(--warn); background: #fdf6e4;
+    border-radius: 10px; padding: 8px 10px; line-height: 1.55; }
+  .done-sec { margin-top: 12px; border-top: 1px dashed #ecdfc8; padding-top: 8px; }
+  .done-head { font-size: 12.5px; font-weight: 700; color: var(--accent-dk); }
+  .done-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft);
+    padding: 5px 2px; }
+  .done-item .d-act { flex: 1; text-decoration: line-through; }
+  .done-item .undo-btn { border: none; background: none; font: inherit; font-size: 10.5px;
+    color: var(--ink-soft); text-decoration: underline; cursor: pointer; }
+
   /* 領域カード */
   details.area {
     background: var(--card); border: 2px solid #ead9bd; border-radius: 18px;
@@ -160,6 +202,25 @@
       <p class="p-note">入力すると、下の各チェックの損失概算が「あなたの数字」で再計算されます。</p>
     </div>
   </details>
+
+  <!-- 🎯 あなたの作戦リスト（見つかった機会損失を客観基準で優先順位づけ） -->
+  <div class="plan-card" id="planCard" hidden>
+    <div class="plan-head">
+      <span class="plan-title">🎯 あなたの作戦リスト</span>
+      <div class="sort-toggle" id="sortToggle">
+        <button type="button" data-sort="rec">おすすめ順</button>
+        <button type="button" data-sort="amount">金額順</button>
+        <button type="button" data-sort="effort">手間が少ない順</button>
+      </div>
+    </div>
+    <p class="plan-note" id="planNote"></p>
+    <div id="planList"></div>
+    <div id="planWarn"></div>
+    <div class="done-sec" id="doneSec" hidden>
+      <div class="done-head" id="doneHead"></div>
+      <div id="doneList"></div>
+    </div>
+  </div>
 
   <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
 
@@ -273,11 +334,13 @@ const CHECKS = [
   // ① 足元のお金
   { id: "cash-bigbank", area: "cash",
     q: "生活防衛資金を、大手銀行の普通預金（金利ほぼゼロ）に置いている",
+    act: "優遇金利の口座へ移す", certainty: 3, effortH: 0.5,
     loss: p => p.savings * 0.0027,
     basis: p => `あなたの預貯金${man(p.savings)}万円 ×（優遇0.29% − 大手0.02%）で試算`,
     fix: "ネット銀行や証券連携の優遇金利口座へ移すだけで、リスクゼロで利息が数十倍に。" },
   { id: "cash-toomuch", area: "cash",
     q: "生活費3ヶ月分＋目先の出費よりも、明らかに多い現金を普通預金に寝かせている",
+    act: "余剰現金の積立を設定する", certainty: 1, effortH: 1,
     loss: p => Math.max(0, p.savings - emergencyCash(p)) * 0.0498,
     basis: p => {
       const sur = Math.max(0, p.savings - emergencyCash(p));
@@ -294,6 +357,7 @@ const CHECKS = [
   // ② お金が必要な時
   { id: "borrow-sarakin", area: "borrow",
     q: "急な出費を、カードローン・リボ払い・サラ金で乗り切ったことがある",
+    act: "高金利の借入を低金利へ借り換える", certainty: 2, effortH: 0.5,
     loss: () => 45000, basis: () => "30万円を年18%で1年借りた場合 vs 担保ローン3%（差15%）",
     fix: "投資資産があれば有価証券担保ローン（2〜4%）、なければ銀行ローンを先に検討。" },
   { id: "borrow-selltax", area: "borrow",
@@ -308,16 +372,19 @@ const CHECKS = [
   // ③ フリーマネー
   { id: "free-shourei", area: "free",
     q: "会社の「職場つみたてNISA」「持株会」の奨励金があるか、確認したことがない",
+    act: "人事ポータルで奨励金を確認する", certainty: 3, effortH: 0.1,
     loss: p => p.monthly * 0.10 * 12,
     basis: p => `あなたの積立 月${man10(p.monthly)}万円 × 奨励金10% × 12ヶ月で試算`,
     fix: "人事・総務ポータルで5分で確認できます。奨励金は即・確定リターン。" },
   { id: "free-dc", area: "free",
     q: "企業型DCのマッチング拠出やiDeCoを使っていない（使えるのに）",
+    act: "DCマッチング／iDeCoを設定する", certainty: 3, effortH: 1,
     loss: p => Math.min(p.monthly, 20000) * 0.30 * 12,
     basis: p => `月${man10(Math.min(p.monthly, 20000))}万円の拠出 × 所得税+住民税30%の控除で試算`,
     fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
   { id: "free-furusato", area: "free",
     q: "ふるさと納税をしていない",
+    act: "ふるさと納税を始める", certainty: 3, effortH: 1,
     loss: p => Math.max(0, Math.round(p.income / 6000000 * 28000)),
     basis: p => `年収${man(p.income)}万円の上限目安 × 返礼品3割 − 2,000円`,
     fix: "ポータルサイトでシミュレーション→上限内で寄付するだけ。" },
@@ -333,11 +400,13 @@ const CHECKS = [
     fix: "給料も資産も同じ会社に依存する状態。奨励金分は活かしつつ、インデックスへ分散を。" },
   { id: "invest-active", area: "invest",
     q: "信託報酬1%超のアクティブ投信やバランスファンドを、比較せずに長期保有している",
+    act: "低コストのインデックス投信へ乗り換える", certainty: 2, effortH: 0.5,
     loss: p => p.savings * 0.014,
     basis: p => `投資残高を預貯金と同程度（${man(p.savings)}万円）と仮定 ×（1.5% − インデックス0.1%）で試算`,
     fix: "同じ中身の低コスト投信がないか一度比較を。コスト差は毎年確実に効きます。" },
   { id: "invest-nothing", area: "invest",
     q: "現金以外の資産を持っていない（投資をまだ始めていない）",
+    act: "インデックス投信の積立を開始する", certainty: 1, effortH: 1,
     loss: p => p.savings * 0.0498,
     basis: p => `あなたの預貯金${man(p.savings)}万円 ×（長期期待5% − 預金0.02%）で試算`,
     fix: "まずは少額からインデックス投信の積立を。「おかねの木」で育ち方を体験できます。" },
@@ -350,9 +419,17 @@ const man10 = v => (v / 10000).toLocaleString(undefined, { maximumFractionDigits
 const $ = id => document.getElementById(id);
 const LS_KEY = "okane_map_checks";
 const LS_PROFILE = "okane_map_profile";
+const LS_DONE = "okane_map_done";
+const LS_SORT = "okane_map_sort";
 let answers = {};
 try { answers = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) { answers = {}; }
 const saveAnswers = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(answers)); } catch (e) {} };
+// 対策済み（✓やった）と並び替えモード
+let done = {};
+try { done = JSON.parse(localStorage.getItem(LS_DONE) || "{}"); } catch (e) { done = {}; }
+const saveDone = () => { try { localStorage.setItem(LS_DONE, JSON.stringify(done)); } catch (e) {} };
+let sortMode = "rec";
+try { sortMode = localStorage.getItem(LS_SORT) || "rec"; } catch (e) {}
 
 // あなたの前提（万円で保持、計算時に円へ）。既定は代表値。
 let profile = { incomeMan: 600, savingsMan: 300, monthlyMan: 3 };
@@ -419,23 +496,26 @@ function renderChecks() {
     else if (answered.length === list.length) { chip.textContent = "✓ 問題なし"; chip.className = "a-chip clear"; }
     else { chip.textContent = `残り${list.length - answered.length}問`; chip.className = "a-chip"; }
   });
-  // サマリー
+  // サマリー（合計・30年換算は「未対策」の分だけ。対策済みは回収として併記）
   const answered = CHECKS.filter(c => answers[c.id]);
   const hits = CHECKS.filter(c => answers[c.id] === "yes");
-  const total = hits.reduce((a, c) => a + lossOf(c), 0);
+  const remaining = hits.filter(c => !done[c.id]);
+  const recovered = hits.filter(c => done[c.id]).reduce((a, c) => a + lossOf(c), 0);
+  const total = remaining.reduce((a, c) => a + lossOf(c), 0);
+  const recNote = recovered > 0 ? `　<span class="s-ok">✓ 対策済み ${yen(recovered)}/年を回収</span>` : "";
   const sumMain = $("sumMain"), sumSub = $("sumSub"), sumCompound = $("sumCompound");
   if (!answered.length) {
     sumMain.textContent = "チェックを始めよう";
     sumSub.textContent = "各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。";
-  } else if (hits.length) {
-    sumMain.innerHTML = `見つかった機会損失 <b>${hits.length}件</b>${total > 0 ? `・合計 <b>${yen(total)}</b>/年` : ""}`;
+  } else if (remaining.length) {
+    sumMain.innerHTML = `見つかった機会損失 <b>${remaining.length}件</b>${total > 0 ? `・合計 <b>${yen(total)}</b>/年` : ""}${recNote}`;
     sumSub.textContent = `※ざっくり概算です。前提は各項目に記載（回答 ${answered.length}/${CHECKS.length}問）`;
   } else {
-    sumMain.innerHTML = `<span class="s-ok">機会損失 0件</span>（回答 ${answered.length}/${CHECKS.length}問）`;
+    sumMain.innerHTML = `<span class="s-ok">未対策の機会損失 0件</span>（回答 ${answered.length}/${CHECKS.length}問）${recNote}`;
     sumSub.textContent = answered.length === CHECKS.length ? "すべて確認済みです。" : "この調子で残りもチェックしてみましょう。";
   }
-  // 30年複利換算：年間の取りこぼしを毎年5%で再投資し続けた場合の差
-  if (hits.length && total > 0) {
+  // 30年複利換算：年間の取りこぼし（未対策分）を毎年5%で再投資し続けた場合の差
+  if (remaining.length && total > 0) {
     const future = total * ((Math.pow(1.05, 30) - 1) / 0.05);   // ≈ total × 66.4
     sumCompound.innerHTML = `このまま30年つづくと <b>${yen(future)}</b> の差（年5%で再投資した場合）<br>` +
       `🌳 この分だけ、あなたの木は小さく育ちます。<a href="index.html">おかねの木で見る</a>`;
@@ -444,11 +524,106 @@ function renderChecks() {
     sumCompound.hidden = true;
   }
   $("allClear").hidden = !(answered.length === CHECKS.length && hits.length === 0);
+  renderPlan(p, lossOf);
 }
+
+/* ===== 🎯 あなたの作戦リスト =====
+   見つかった機会損失を客観基準で優先順位づけして「次の一手」を提示する。
+   おすすめ順の根拠 = ①確実に増えるお金 → ②消えているコストを止める → ③期待リターン
+   （同じ階層の中では時給換算＝年間額÷手間 の高い順） */
+const TIER = {
+  3: { label: "① まず確実に増えるお金（金利・奨励金・税優遇）", badge: "🎯 確実" },
+  2: { label: "② 次に、消えているコストを止める", badge: "💸 コスト" },
+  1: { label: "③ 最後に、期待リターンを取りにいく", badge: "📈 期待値" },
+};
+const SORT_NOTE = {
+  rec: "おすすめ順＝確実なもの → コスト解消 → 期待リターンの順。同じ階層では時給換算（年間額÷手間）の高い順。",
+  amount: "金額順＝年間の損失概算が大きい順。",
+  effort: "手間が少ない順＝かかる時間が短い順（同じなら金額順）。",
+};
+const effortLabel = h => h < 0.25 ? "約5分" : h < 0.75 ? "約30分" : `約${h}時間`;
+
+function renderPlan(p, lossOf) {
+  const card = $("planCard");
+  const hits = CHECKS.filter(c => answers[c.id] === "yes");
+  const actionable = hits.filter(c => c.act && lossOf(c) > 0);
+  const doneItems = hits.filter(c => c.act && done[c.id]);
+  const todo = actionable.filter(c => !done[c.id]);
+  if (!todo.length && !doneItems.length) { card.hidden = true; return; }
+  card.hidden = false;
+
+  // 並び替え
+  const rate = c => lossOf(c) / c.effortH;   // 時給換算
+  let sorted = [...todo];
+  if (sortMode === "amount") sorted.sort((a, b) => lossOf(b) - lossOf(a));
+  else if (sortMode === "effort") sorted.sort((a, b) => a.effortH - b.effortH || lossOf(b) - lossOf(a));
+  else sorted.sort((a, b) => b.certainty - a.certainty || rate(b) - rate(a));
+
+  // トグルUIとノート
+  document.querySelectorAll("#sortToggle button").forEach(b =>
+    b.classList.toggle("on", b.dataset.sort === sortMode));
+  $("planNote").textContent = SORT_NOTE[sortMode];
+
+  // リスト描画（おすすめ順のときは階層見出しを挟む）
+  let html = "", rank = 0, lastTier = null;
+  for (const c of sorted) {
+    rank++;
+    if (sortMode === "rec" && c.certainty !== lastTier) {
+      html += `<div class="tier-head">${TIER[c.certainty].label}</div>`;
+      lastTier = c.certainty;
+    }
+    const lv = lossOf(c);
+    html += `<div class="plan-item" data-id="${c.id}">
+      <span class="rank">${rank}</span>
+      <div class="pi-main">
+        <div class="pi-act">${c.act}</div>
+        <div class="pi-meta">
+          <span class="pi-badge amt">年${yen(lv).replace("約","")}</span>
+          <span class="pi-badge c${c.certainty}">${TIER[c.certainty].badge}</span>
+          <span class="pi-badge eff">⏱ ${effortLabel(c.effortH)}</span>
+        </div>
+        <div class="pi-rate">⚡ この${effortLabel(c.effortH).replace("約","")}は、時給換算 ${yen(rate(c))} の作業</div>
+      </div>
+      <button type="button" class="done-btn" data-done="${c.id}">✓ やった</button>
+    </div>`;
+  }
+  $("planList").innerHTML = html;
+
+  // 金額化できないが重要な項目（集中リスク）
+  $("planWarn").innerHTML = answers["invest-mochikabu"] === "yes"
+    ? `<div class="plan-warn">⚠ 金額にできないが重要：<b>1銘柄への集中</b>は、会社の不調と資産が同時に傷むリスク。奨励金分は活かしつつ分散を（④参照）。</div>`
+    : "";
+
+  // 対策済み
+  const recovered = doneItems.reduce((a, c) => a + lossOf(c), 0);
+  $("doneSec").hidden = !doneItems.length;
+  if (doneItems.length) {
+    $("doneHead").textContent = `✅ 対策済み（${yen(recovered)}/年を回収）`;
+    $("doneList").innerHTML = doneItems.map(c =>
+      `<div class="done-item"><span>✓</span><span class="d-act">${c.act}</span><span>${yen(lossOf(c))}/年</span><button type="button" class="undo-btn" data-undo="${c.id}">取り消す</button></div>`).join("");
+  }
+
+  // ✓やった／取り消す
+  card.querySelectorAll("[data-done]").forEach(b => b.addEventListener("click", () => {
+    done[b.dataset.done] = true; saveDone(); renderChecks();
+  }));
+  card.querySelectorAll("[data-undo]").forEach(b => b.addEventListener("click", () => {
+    delete done[b.dataset.undo]; saveDone(); renderChecks();
+  }));
+}
+
+document.querySelectorAll("#sortToggle button").forEach(b =>
+  b.addEventListener("click", () => {
+    sortMode = b.dataset.sort;
+    try { localStorage.setItem(LS_SORT, sortMode); } catch (e) {}
+    renderChecks();
+  }));
 
 $("resetChecks").addEventListener("click", () => {
   answers = {};
+  done = {};
   saveAnswers();
+  saveDone();
   renderChecks();
 });
 
