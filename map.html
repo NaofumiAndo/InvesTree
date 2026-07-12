@@ -64,6 +64,32 @@
   .profile-card input:focus { outline: none; border-color: var(--accent); }
   .profile-card .p-note { margin: 8px 0 0; font-size: 11px; color: var(--ink-soft); }
 
+  /* 🩺 かんたん診断（1問ずつ） */
+  .quiz-card { background: var(--card); border: 2px solid #cfe0c9; border-radius: 18px;
+    margin: 0 0 16px; padding: 12px 14px 12px; box-shadow: 0 5px 16px var(--shadow); }
+  .quiz-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .quiz-title { font-size: 15px; font-weight: 700; }
+  .quiz-prog { font-size: 11px; font-weight: 700; color: var(--ink-soft); background: #f0e7d4;
+    border-radius: 10px; padding: 3px 10px; }
+  .quiz-lead { margin: 8px 0 2px; font-size: 11.5px; color: var(--ink-soft); }
+  .quiz-fb { margin: 8px 0 2px; font-size: 12px; font-weight: 700; border-radius: 10px; padding: 7px 10px; }
+  .quiz-fb.hit { background: #fdf0e6; color: var(--bad); }
+  .quiz-fb.ok { background: #eef7ea; color: var(--accent-dk); }
+  .quiz-area { margin: 10px 0 3px; font-size: 10.5px; font-weight: 700; color: var(--accent-dk); }
+  .quiz-q { font-size: 14.5px; font-weight: 700; line-height: 1.55; margin: 2px 0 12px; }
+  .quiz-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+  .quiz-btns button { flex: 1; min-width: 90px; border: 1.5px solid #ead9bd; background: #fff;
+    border-radius: 12px; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink);
+    padding: 11px 0; cursor: pointer; transition: all .12s; }
+  .quiz-btns button:hover { border-color: var(--accent); background: #f4faf2; }
+  .quiz-btns button.skip { flex: 0 0 auto; min-width: 74px; font-size: 11.5px; color: var(--ink-soft); }
+  .quiz-donemsg { margin: 10px 0 6px; font-size: 13px; font-weight: 700; line-height: 1.6; }
+  .quiz-review { margin-top: 10px; border-top: 1px dashed #ecdfc8; padding-top: 8px; }
+  .quiz-review > summary { list-style: none; cursor: pointer; font-size: 11.5px; color: var(--ink-soft);
+    text-decoration: underline; }
+  .quiz-review > summary::-webkit-details-marker { display: none; }
+  .rv-area { margin: 10px 0 2px; font-size: 11px; font-weight: 700; color: var(--accent-dk); }
+
   /* 🎯 作戦リスト */
   .plan-card { background: var(--card); border: 2px solid #dcc9a4; border-radius: 18px;
     margin: 0 0 16px; padding: 12px 14px 14px; box-shadow: 0 5px 16px var(--shadow); }
@@ -236,7 +262,7 @@
   <div class="summary" id="summaryBar">
     <div class="s-main" id="sumMain">チェックを始めよう</div>
     <button type="button" class="s-reset" id="resetChecks">↺ リセット</button>
-    <div class="s-sub" id="sumSub">各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。</div>
+    <div class="s-sub" id="sumSub">下の診断に答えると、見つかった機会損失がここに集計されます。</div>
     <div class="s-compound" id="sumCompound" hidden></div>
   </div>
 
@@ -250,6 +276,19 @@
       <p class="p-note">入力すると、下の各チェックの損失概算が「あなたの数字」で再計算されます。</p>
     </div>
   </details>
+
+  <!-- 🩺 かんたん診断（1問ずつ・はい/いいえ。読み物は下の①〜④に分離） -->
+  <div class="quiz-card" id="quizCard">
+    <div class="quiz-head">
+      <span class="quiz-title">🩺 かんたん診断</span>
+      <span class="quiz-prog" id="quizProg"></span>
+    </div>
+    <div id="quizBody"></div>
+    <details class="quiz-review" id="quizReview" hidden>
+      <summary>回答を見直す</summary>
+      <div id="reviewHost"></div>
+    </details>
+  </div>
 
   <!-- 🎯 あなたの作戦リスト（見つかった機会損失を客観基準で優先順位づけ） -->
   <div class="plan-card" id="planCard" hidden>
@@ -303,7 +342,6 @@
       </table></div>
       <div class="howto"><b>選び方：</b>まず<b>上の会社の制度から</b>（奨励金は即・確定リターン。※持株会は1銘柄集中に注意→③）。次に税優遇（iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
 
-      <div class="checks" data-checks="free"></div>
       <div class="howto" style="margin-top:12px">⚠ <b>奨励金つきでも中身は「投資」です</b>（DCは60歳まで引き出せません）。金額を決める前に、②でいくらまで運用に回せるかを確認しましょう。</div>
     </div>
   </details>
@@ -330,7 +368,6 @@
       </table></div>
       <div class="howto"><b>選び方：</b>使う時期の近さで置き分けるのが基本。すぐ使う→優遇金利の普通預金／使わないと決めた分→定期・金銭信託／投資に回す分→MRF。</div>
 
-      <div class="checks" data-checks="cash"></div>
     </div>
   </details>
 
@@ -372,7 +409,6 @@
       </table></div>
       <div class="howto"><b>選び方：</b>軸は<b>低コスト×分散</b>（インデックス投信）。自分で調整したくないならバランス型／ターゲットデート。持ち株会は奨励金の範囲でほどほどに。コスト1%の差は30年で資産の2〜3割の差になります。</div>
 
-      <div class="checks" data-checks="invest"></div>
     </div>
   </details>
 
@@ -395,7 +431,6 @@
       </table></div>
       <div class="howto"><b>選び方：</b>総コスト順に検討。①家族 → ②担保ローン（投資を持っているなら）→ ③銀行ローン → ④売却（含み益が小さいものから）→ サラ金は最後の手段にしない設計を。</div>
 
-      <div class="checks" data-checks="borrow"></div>
     </div>
   </details>
 
@@ -531,10 +566,16 @@ const profileYen = () => ({
 
 const yen = v => v >= 10000 ? `約${(v/10000).toLocaleString(undefined,{maximumFractionDigits:1})}万円` : `約${Math.round(v).toLocaleString()}円`;
 
+// 診断の出題順＝ページの4ステップと同じ（①もらう→②余裕→③商品→④備え）
+const QUIZ_AREA_ORDER = ["free", "cash", "invest", "borrow"];
+const AREA_LABEL = { free: "① もらい忘れているお金", cash: "② 運用に回せる余裕", invest: "③ 何で運用する？", borrow: "④ 急な出費のとき" };
+const quizList = QUIZ_AREA_ORDER.flatMap(a => CHECKS.filter(c => c.area === a));
+
+// 「回答を見直す」用の一覧（診断カード内・折りたたみ）
 function buildChecks() {
-  document.querySelectorAll("[data-checks]").forEach(host => {
-    const area = host.getAttribute("data-checks");
-    host.innerHTML = CHECKS.filter(c => c.area === area).map(c => `
+  $("reviewHost").innerHTML = QUIZ_AREA_ORDER.map(a =>
+    `<div class="rv-area">${AREA_LABEL[a]}</div>` +
+    CHECKS.filter(c => c.area === a).map(c => `
       <div class="check" data-id="${c.id}">
         <div class="q">${c.q}</div>
         <div class="loss" hidden></div>
@@ -543,8 +584,8 @@ function buildChecks() {
           <button type="button" data-ans="yes">はい</button>
           <button type="button" data-ans="no">いいえ</button>
         </div>
-      </div>`).join("");
-  });
+      </div>`).join("")
+  ).join("");
   document.querySelectorAll(".check .btns button").forEach(btn =>
     btn.addEventListener("click", () => {
       const id = btn.closest(".check").getAttribute("data-id");
@@ -552,6 +593,51 @@ function buildChecks() {
       saveAnswers();
       renderChecks();
     }));
+}
+
+// ===== 🩺 かんたん診断：1問ずつ出題（あとで＝スキップ可・回答は保存） =====
+let quizSkip = new Set();
+let quizFeedback = null;   // { cls, text } 直前の回答への即時フィードバック
+function renderQuiz(p, lossOf) {
+  const total = quizList.length;
+  const answeredN = quizList.filter(c => answers[c.id]).length;
+  $("quizProg").textContent = `${answeredN}/${total}問`;
+  const next = quizList.find(c => !answers[c.id] && !quizSkip.has(c.id));
+  const restN = quizList.filter(c => !answers[c.id]).length;
+  const body = $("quizBody");
+  if (next) {
+    body.innerHTML =
+      (quizFeedback
+        ? `<div class="quiz-fb ${quizFeedback.cls}">${quizFeedback.text}</div>`
+        : `<p class="quiz-lead">はい／いいえで答えるだけ。ぜんぶで約1分です。</p>`) +
+      `<div class="quiz-area">${AREA_LABEL[next.area]}</div>` +
+      `<div class="quiz-q">${next.q}</div>` +
+      `<div class="quiz-btns">
+        <button type="button" data-qa="yes">はい</button>
+        <button type="button" data-qa="no">いいえ</button>
+        <button type="button" data-qa="skip" class="skip">あとで</button>
+      </div>`;
+    body.querySelectorAll("[data-qa]").forEach(b => b.addEventListener("click", () => {
+      if (b.dataset.qa === "skip") { quizSkip.add(next.id); quizFeedback = null; renderChecks(); return; }
+      answers[next.id] = b.dataset.qa;
+      saveAnswers();
+      quizFeedback = b.dataset.qa === "yes"
+        ? { cls: "hit", text: `💸 機会損失を発見：${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "金額にできない重要リスク"} — 作戦リストに追加しました` }
+        : { cls: "ok", text: "✓ OK！次にいきましょう" };
+      renderChecks();
+    }));
+  } else if (restN > 0) {
+    body.innerHTML =
+      `<div class="quiz-donemsg">残り${restN}問は「あとで」にしました。いつでも再開できます（回答は保存済み）。</div>` +
+      `<div class="quiz-btns"><button type="button" id="quizResume">残りに答える</button></div>`;
+    $("quizResume").addEventListener("click", () => { quizSkip.clear(); quizFeedback = null; renderChecks(); });
+  } else {
+    const hitsN = quizList.filter(c => answers[c.id] === "yes").length;
+    body.innerHTML = `<div class="quiz-donemsg">${hitsN
+      ? `🩺 診断完了！機会損失が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
+      : "🎉 診断完了！大きな取りこぼしはありませんでした。"}</div>`;
+  }
+  $("quizReview").hidden = answeredN === 0;
 }
 
 function renderChecks() {
@@ -594,7 +680,7 @@ function renderChecks() {
   const sumMain = $("sumMain"), sumSub = $("sumSub"), sumCompound = $("sumCompound");
   if (!answered.length) {
     sumMain.textContent = "チェックを始めよう";
-    sumSub.textContent = "各カードを開いて「はい／いいえ」で答えると、見つかった機会損失がここに集計されます。";
+    sumSub.textContent = "下の診断に答えると、見つかった機会損失がここに集計されます。";
   } else if (remaining.length) {
     sumMain.innerHTML = `見つかった機会損失 <b>${remaining.length}件</b>${total > 0 ? `・合計 <b>${yen(total)}</b>/年` : ""}${recNote}`;
     sumSub.textContent = `※ざっくり概算です。前提は各項目に記載（回答 ${answered.length}/${CHECKS.length}問）`;
@@ -612,6 +698,7 @@ function renderChecks() {
     sumCompound.hidden = true;
   }
   $("allClear").hidden = !(answered.length === CHECKS.length && hits.length === 0);
+  renderQuiz(p, lossOf);
   renderMargin(p);
   renderPlan(p, lossOf);
 }
@@ -780,6 +867,8 @@ document.querySelectorAll("#sortToggle button").forEach(b =>
 $("resetChecks").addEventListener("click", () => {
   answers = {};
   done = {};
+  quizSkip.clear();
+  quizFeedback = null;
   saveAnswers();
   saveDone();
   renderChecks();
