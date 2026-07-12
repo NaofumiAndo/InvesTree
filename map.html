@@ -106,6 +106,24 @@
   .done-item .undo-btn { border: none; background: none; font: inherit; font-size: 10.5px;
     color: var(--ink-soft); text-decoration: underline; cursor: pointer; }
 
+  /* 🏢 勤務先の制度データ（人事連携デモ） */
+  .company-box { border: 1.5px solid #cfe0c9; border-radius: 14px; background: #f4faf2;
+    padding: 10px 12px; margin: 10px 0 4px; }
+  .cb-loading { font-size: 12px; color: var(--ink-soft); padding: 6px 0; }
+  .cb-dots span { animation: cbBlink 1.2s infinite; }
+  .cb-dots span:nth-child(2) { animation-delay: .2s; }
+  .cb-dots span:nth-child(3) { animation-delay: .4s; }
+  @keyframes cbBlink { 0%,80%,100% { opacity: .2; } 40% { opacity: 1; } }
+  .cb-head { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .cb-chip { font-size: 10px; font-weight: 700; background: #e7f3e2; color: var(--accent-dk);
+    border: 1px solid #bcd9b4; border-radius: 9px; padding: 2px 8px; }
+  .cb-table { width: 100%; border-collapse: collapse; font-size: 12px; margin: 7px 0 4px; }
+  .cb-table td { padding: 5px 4px; border-bottom: 1px dashed #d8e6d3; vertical-align: top; }
+  .cb-table td:last-child { text-align: right; white-space: nowrap; }
+  .cb-table b { color: var(--accent-dk); }
+  .cb-sub { display: block; font-size: 10px; color: var(--ink-soft); }
+  .cb-src { font-size: 10px; color: var(--ink-soft); opacity: .8; }
+
   /* 領域カード */
   details.area {
     background: var(--card); border: 2px solid #ead9bd; border-radius: 18px;
@@ -276,6 +294,20 @@
     <div class="a-body">
       <p class="a-lead">会社や国が「使ってくれたら上乗せします」と用意しているお金。<b>申請しないだけで消えている</b>、いちばん確実なリターンです。</p>
 
+      <!-- 勤務先の制度データ（人事システム連携のデモ） -->
+      <div class="company-box" id="companyBox">
+        <div class="cb-loading" id="cbLoading">🏢 勤務先の制度データを参照中<span class="cb-dots"><span>.</span><span>.</span><span>.</span></span></div>
+        <div class="cb-body" id="cbBody" hidden>
+          <div class="cb-head">🏢 サンプル商事株式会社<span class="cb-chip">✓ 人事データ連携済み</span></div>
+          <table class="cb-table">
+            <tr><td>職場つみたてNISA 奨励金</td><td><b>拠出額の10%</b><span class="cb-sub">上限 月5,000円</span></td></tr>
+            <tr><td>持株会 奨励金</td><td><b>拠出額の8%</b><span class="cb-sub">上限 月3,000円</span></td></tr>
+            <tr><td>企業型DC マッチング拠出</td><td><b>上限 月20,000円</b><span class="cb-sub">全額所得控除</span></td></tr>
+          </table>
+          <div class="cb-src">最終同期：2026-07-01 09:12・人事システム連携（※デモ用サンプルデータ）</div>
+        </div>
+      </div>
+
       <h3 class="sec">代表的なフリーマネー</h3>
       <div class="tbl-scroll"><table class="cmp-table">
         <thead><tr><th>制度</th><th>もらえる目安</th><th>確認先</th></tr></thead>
@@ -330,6 +362,14 @@
    ========================================================================= */
 const man = v => (v / 10000).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
+// 勤務先の制度データ（人事システム連携のデモ。実運用ではAPIで取得する想定）
+const COMPANY = {
+  name: "サンプル商事株式会社",
+  nisaMatchRate: 0.10, nisaMatchCap: 5000,   // 職場つみたてNISA奨励金 10%・上限 月5,000円
+  mochikabuRate: 0.08, mochikabuCap: 3000,   // 持株会奨励金 8%・上限 月3,000円
+  dcCapMonthly: 20000,                        // DCマッチング拠出 上限 月2万円
+};
+
 const CHECKS = [
   // ① 足元のお金
   { id: "cash-bigbank", area: "cash",
@@ -371,16 +411,16 @@ const CHECKS = [
 
   // ③ フリーマネー
   { id: "free-shourei", area: "free",
-    q: "会社の「職場つみたてNISA」「持株会」の奨励金があるか、確認したことがない",
-    act: "人事ポータルで奨励金を確認する", certainty: 3, effortH: 0.1,
-    loss: p => p.monthly * 0.10 * 12,
-    basis: p => `あなたの積立 月${man10(p.monthly)}万円 × 奨励金10% × 12ヶ月で試算`,
-    fix: "人事・総務ポータルで5分で確認できます。奨励金は即・確定リターン。" },
+    q: `勤務先（${COMPANY.name}）の職場つみたてNISA奨励金（拠出額の10%）を受け取っていない`,
+    act: "職場つみたてNISAの奨励金を申請する", certainty: 3, effortH: 0.1,
+    loss: p => Math.min(p.monthly * COMPANY.nisaMatchRate, COMPANY.nisaMatchCap) * 12,
+    basis: p => `${COMPANY.name}の奨励金 10%（上限 月5,000円）× あなたの積立 月${man10(p.monthly)}万円 ※人事データ連携（デモ）`,
+    fix: "社内ポータルの「職場つみたてNISA」から5分で申請できます。奨励金は即・確定リターン。" },
   { id: "free-dc", area: "free",
-    q: "企業型DCのマッチング拠出やiDeCoを使っていない（使えるのに）",
-    act: "DCマッチング／iDeCoを設定する", certainty: 3, effortH: 1,
-    loss: p => Math.min(p.monthly, 20000) * 0.30 * 12,
-    basis: p => `月${man10(Math.min(p.monthly, 20000))}万円の拠出 × 所得税+住民税30%の控除で試算`,
+    q: `勤務先（${COMPANY.name}）の企業型DCマッチング拠出（上限 月2万円）を使っていない`,
+    act: "DCマッチング拠出を設定する", certainty: 3, effortH: 1,
+    loss: p => Math.min(p.monthly, COMPANY.dcCapMonthly) * 0.30 * 12,
+    basis: p => `会社上限 月2万円までの拠出 月${man10(Math.min(p.monthly, COMPANY.dcCapMonthly))}万円 × 所得税+住民税30%の控除 ※人事データ連携（デモ）`,
     fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
   { id: "free-furusato", area: "free",
     q: "ふるさと納税をしていない",
@@ -639,6 +679,12 @@ function syncProfileInputs() {
     if (!isNaN(v) && v >= 0) { profile[key] = v; saveProfile(); renderChecks(); }
   });
 });
+
+// 勤務先データの「参照中→取得完了」演出（実運用ではここが人事API呼び出しになる）
+setTimeout(() => {
+  $("cbLoading").hidden = true;
+  $("cbBody").hidden = false;
+}, 900);
 
 syncProfileInputs();
 buildChecks();
