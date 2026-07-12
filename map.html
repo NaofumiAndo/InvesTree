@@ -505,16 +505,6 @@ const CHECKS = [
     loss: p => Math.min(p.monthly, COMPANY.dcCapMonthly) * 0.30 * 12,
     basis: p => `会社上限 月2万円までの拠出 月${man10(Math.min(p.monthly, COMPANY.dcCapMonthly))}万円 × 所得税+住民税30%の控除 ※人事データ連携（デモ）`,
     fix: "掛金が全額所得控除＝拠出した瞬間に税金が戻る仕組みです。" },
-  { id: "free-furusato", area: "free",
-    q: "ふるさと納税をしていない",
-    act: "ふるさと納税を始める", certainty: 3, effortH: 1,
-    loss: p => Math.max(0, Math.round(p.income / 6000000 * 28000)),
-    basis: p => `年収${man(p.income)}万円の上限目安 × 返礼品3割 − 2,000円`,
-    fix: "ポータルサイトでシミュレーション→上限内で寄付するだけ。" },
-  { id: "free-hojo", area: "free",
-    q: "引越し・出産・リフォームなどの時に、補助金を検索する習慣がない",
-    loss: () => 0, basis: () => "単発・条件次第のため合計には入れず（数万〜百万円台のことも）",
-    fix: "ライフイベントのたびに「自治体名 + 補助金」で検索を習慣に。" },
 
   // ④ 投資の選択肢
   { id: "invest-mochikabu", area: "invest",
