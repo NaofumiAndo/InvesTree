@@ -91,6 +91,8 @@
   .pi-badge.c2 { background: #fdeccd; color: var(--warn); }
   .pi-badge.c1 { background: #e8e4f5; color: #6b5ea8; }
   .pi-badge.eff { background: #f0e7d4; color: var(--ink-soft); }
+  .pi-badge.lock { background: #f3e4e0; color: #a86450; }
+  .pi-warn { margin-top: 5px; font-size: 11px; color: var(--bad); font-weight: 700; }
   .plan-item .pi-rate { margin-top: 4px; font-size: 11px; color: var(--accent-dk); font-weight: 700; }
   .plan-item .done-btn { flex: 0 0 auto; align-self: center; border: 1.5px solid #ead9bd; background: #fff;
     border-radius: 10px; font: inherit; font-size: 11.5px; font-weight: 700; color: var(--ink-soft);
@@ -123,6 +125,34 @@
   .cb-table b { color: var(--accent-dk); }
   .cb-sub { display: block; font-size: 10px; color: var(--ink-soft); }
   .cb-src { font-size: 10px; color: var(--ink-soft); opacity: .8; }
+
+  /* 🏦 余裕診断 */
+  .margin-box { border-radius: 14px; padding: 11px 13px; margin: 10px 0 4px; font-size: 12.5px; line-height: 1.6; }
+  .margin-box.ok { background: #eef7ea; border: 1.5px solid #bcd9b4; }
+  .margin-box.tight { background: #fdf6e4; border: 1.5px solid #ecd9a8; }
+  .margin-box.short { background: #fdf0e6; border: 1.5px solid #e8c3a6; }
+  .margin-box .mb-verdict { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .margin-box.ok .mb-verdict { color: var(--accent-dk); }
+  .margin-box.tight .mb-verdict { color: var(--warn); }
+  .margin-box.short .mb-verdict { color: var(--bad); }
+  .margin-box .mb-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--ink-soft); }
+  .margin-box .mb-row b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .margin-box .mb-note { font-size: 10.5px; color: var(--ink-soft); opacity: .85; margin-top: 5px; }
+
+  /* 🌳 2問で決まる商品えらび */
+  .picker { border: 1.5px solid #cfe0c9; border-radius: 14px; background: #f4faf2; padding: 11px 13px; margin: 10px 0 4px; }
+  .pk-q { font-size: 13px; font-weight: 700; margin: 2px 0 7px; }
+  .pk-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pk-btns button { border: 1.5px solid #ead9bd; background: #fff; border-radius: 11px;
+    font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ink-soft);
+    padding: 8px 14px; cursor: pointer; }
+  .pk-btns button:hover { border-color: var(--accent); }
+  .pk-btns button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .pk-result { margin-top: 8px; background: #fff; border: 1.5px solid #bcd9b4; border-radius: 12px;
+    padding: 10px 12px; font-size: 12.5px; line-height: 1.65; }
+  .pk-result .pk-name { font-size: 14.5px; font-weight: 700; color: var(--accent-dk); }
+  .pk-result .pk-pts { margin: 5px 0 0; padding-left: 17px; color: var(--ink-soft); font-size: 12px; }
+  .pk-result .pk-pts li { margin: 3px 0; }
 
   /* 領域カード */
   details.area {
@@ -200,7 +230,7 @@
   <a class="back-link" href="index.html">← おかねの木へ</a>
   <header class="map">
     <h1>💡 おかねの機会損失マップ</h1>
-    <p>知らないだけで損している選択はないか。<br>サラリーマンのお金の置き方を、4つの領域でチェックします。</p>
+    <p>知らないだけで損している選択はないか。<br><b>①もらう → ②余裕を確認 → ③商品をえらぶ → ④もしもに備える</b> の4ステップでチェックします。</p>
   </header>
 
   <div class="summary" id="summaryBar">
@@ -242,57 +272,11 @@
 
   <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
 
-  <!-- ① 足元に置いておくお金 -->
-  <details class="area" data-area="cash">
-    <summary><span class="a-emoji">🏦</span>① 足元に置いておくお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
-    <div class="a-body">
-      <p class="a-lead"><b>量の目安は「生活費の3ヶ月分＋3年以内に使う大きな出費」。</b>それ以上の現金は寝かせるほど機会損失。そして同じ現金でも、<b>どこに置くかで利息が数十倍</b>違います。</p>
-
-      <h3 class="sec">置き場所の比較（金利は2026年時点の目安）</h3>
-      <div class="tbl-scroll"><table class="cmp-table">
-        <thead><tr><th>置き場所</th><th>金利(年)</th><th>引き出し</th><th>向くお金</th></tr></thead>
-        <tbody>
-          <tr class="worst"><td>普通預金<span class="sub">大手銀行</span></td><td>0.02〜0.1%</td><td>いつでも</td><td>日常の出し入れ（多く置きすぎない）</td></tr>
-          <tr class="best"><td>優遇金利の口座<span class="sub">ネット銀行・証券連携</span></td><td>0.1〜0.3%</td><td>いつでも</td><td>生活防衛資金の基本形</td></tr>
-          <tr><td>定期預金<span class="sub">満期まで固定</span></td><td>0.1〜0.5%</td><td>満期まで原則固定</td><td>1〜3年使わないと決めたお金</td></tr>
-          <tr><td>金銭信託<span class="sub">信託銀行</span></td><td>0.2〜0.5%</td><td>期間満了まで</td><td>まとまった当面使わないお金</td></tr>
-          <tr><td>MRF<span class="sub">証券口座の待機資金</span></td><td>〜0.1%前後</td><td>すぐ買付に回せる</td><td>投資の待機資金</td></tr>
-        </tbody>
-      </table></div>
-      <div class="howto"><b>選び方：</b>使う時期の近さで置き分けるのが基本。すぐ使う→優遇金利の普通預金／使わないと決めた分→定期・金銭信託／投資に回す分→MRF。</div>
-
-      <div class="checks" data-checks="cash"></div>
-    </div>
-  </details>
-
-  <!-- ② お金が必要な時の選択肢 -->
-  <details class="area" data-area="borrow">
-    <summary><span class="a-emoji">🆘</span>② お金が急に必要な時<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
-    <div class="a-body">
-      <p class="a-lead">急な出費のとき、どう工面するかで<b>総コストが桁違い</b>になります。慌てて選ぶ前に、選択肢を全部知っておくこと自体が備えです。</p>
-
-      <h3 class="sec">5つの選択肢のプロコン（金利は目安）</h3>
-      <div class="tbl-scroll"><table class="cmp-table">
-        <thead><tr><th>方法</th><th>コスト(年)</th><th>強み</th><th>弱み</th></tr></thead>
-        <tbody>
-          <tr><td>親・家族に借りる</td><td>0%</td><td>コストなし・早い</td><td>心理的負担・関係リスク</td></tr>
-          <tr class="worst"><td>サラ金・カードローン<span class="sub">リボ払い含む</span></td><td>15〜18%</td><td>即日・手軽</td><td>圧倒的高金利。常習化しやすい</td></tr>
-          <tr><td>投資商品を売る</td><td>利益に約20%課税</td><td>借金にならない</td><td>複利が止まる・木を切る行為</td></tr>
-          <tr><td>銀行ローン<span class="sub">フリー/目的別</span></td><td>2〜14%</td><td>まとまった額に対応</td><td>審査に日数・使途制限あり</td></tr>
-          <tr class="best"><td>有価証券担保ローン<span class="sub">証券担保・株担保</span></td><td>2〜4%</td><td>売らずに現金化＝複利継続・課税なし</td><td>証券口座と担保余力が必要</td></tr>
-        </tbody>
-      </table></div>
-      <div class="howto"><b>選び方：</b>総コスト順に検討。①家族 → ②担保ローン（投資を持っているなら）→ ③銀行ローン → ④売却（含み益が小さいものから）→ サラ金は最後の手段にしない設計を。</div>
-
-      <div class="checks" data-checks="borrow"></div>
-    </div>
-  </details>
-
-  <!-- ③ フリーマネー -->
+  <!-- ① フリーマネー（強い動機づくり：もらえるお金から始める） -->
   <details class="area" data-area="free">
-    <summary><span class="a-emoji">🎁</span>③ もらい忘れているお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <summary><span class="a-emoji">🎁</span>① もらい忘れているお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
-      <p class="a-lead">会社や国が「使ってくれたら上乗せします」と用意しているお金。<b>申請しないだけで消えている</b>、いちばん確実なリターンです。</p>
+      <p class="a-lead">まずは、会社や国が「使ってくれたら上乗せします」と用意しているお金から。<b>申請しないだけで消えている</b>、いちばん確実なリターンです。</p>
 
       <!-- 勤務先の制度データ（人事システム連携のデモ） -->
       <div class="company-box" id="companyBox">
@@ -313,7 +297,7 @@
         <thead><tr><th>制度</th><th>もらえる目安</th><th>確認先</th></tr></thead>
         <tbody>
           <tr class="best"><td>職場つみたてNISA 奨励金</td><td>拠出額の5〜20%上乗せ</td><td>人事・総務ポータル</td></tr>
-          <tr class="best"><td>持株会 奨励金</td><td>拠出額の5〜15%上乗せ<span class="sub">※1銘柄集中には注意（④参照）</span></td><td>人事・総務ポータル</td></tr>
+          <tr class="best"><td>持株会 奨励金</td><td>拠出額の5〜15%上乗せ<span class="sub">※1銘柄集中には注意（③参照）</span></td><td>人事・総務ポータル</td></tr>
           <tr><td>企業型DC・マッチング拠出</td><td>掛金が全額所得控除</td><td>人事・総務ポータル</td></tr>
           <tr><td>iDeCo</td><td>掛金が全額所得控除</td><td>証券会社</td></tr>
           <tr><td>ふるさと納税</td><td>実質2,000円で返礼品（寄付額の約3割）</td><td>ポータルサイト</td></tr>
@@ -323,14 +307,58 @@
       <div class="howto"><b>選び方：</b>まず<b>会社の制度から</b>（奨励金は即・確定リターン）。次に税優遇（DC/iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
 
       <div class="checks" data-checks="free"></div>
+      <div class="howto" style="margin-top:12px">⚠ <b>奨励金つきでも中身は「投資」です</b>（DCは60歳まで引き出せません）。金額を決める前に、②でいくらまで運用に回せるかを確認しましょう。</div>
     </div>
   </details>
 
-  <!-- ④ 投資の選択肢とコスト -->
-  <details class="area" data-area="invest">
-    <summary><span class="a-emoji">🌳</span>④ 投資の選択肢とコスト<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+  <!-- ② 運用に回せる余裕はあるか（現金の土台チェック） -->
+  <details class="area" data-area="cash">
+    <summary><span class="a-emoji">🏦</span>② 運用に回せる余裕はある？<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
     <div class="a-body">
-      <p class="a-lead">同じ「投資している」でも、<b>集中しすぎ・コスト高すぎ</b>は静かな機会損失。選択肢の全体像とコストを知っておきましょう。</p>
+      <p class="a-lead">①でやる気が出たら、次は<b>いくらまで安心して運用に回せるか</b>。目安は「生活費の3ヶ月分＋3年以内に使う大きな出費」を現金で残し、<b>それを超える分が運用に回せる余裕</b>です。</p>
+
+      <!-- 余裕診断（プロフィールの数字から自動計算） -->
+      <div class="margin-box" id="marginBox"></div>
+
+      <h3 class="sec">残す現金の置き場所（金利は2026年時点の目安）</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>置き場所</th><th>金利(年)</th><th>引き出し</th><th>向くお金</th></tr></thead>
+        <tbody>
+          <tr class="worst"><td>普通預金<span class="sub">大手銀行</span></td><td>0.02〜0.1%</td><td>いつでも</td><td>日常の出し入れ（多く置きすぎない）</td></tr>
+          <tr class="best"><td>優遇金利の口座<span class="sub">ネット銀行・証券連携</span></td><td>0.1〜0.3%</td><td>いつでも</td><td>生活防衛資金の基本形</td></tr>
+          <tr><td>定期預金<span class="sub">満期まで固定</span></td><td>0.1〜0.5%</td><td>満期まで原則固定</td><td>1〜3年使わないと決めたお金</td></tr>
+          <tr><td>金銭信託<span class="sub">信託銀行</span></td><td>0.2〜0.5%</td><td>期間満了まで</td><td>まとまった当面使わないお金</td></tr>
+          <tr><td>MRF<span class="sub">証券口座の待機資金</span></td><td>〜0.1%前後</td><td>すぐ買付に回せる</td><td>投資の待機資金</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>使う時期の近さで置き分けるのが基本。すぐ使う→優遇金利の普通預金／使わないと決めた分→定期・金銭信託／投資に回す分→MRF。</div>
+
+      <div class="checks" data-checks="cash"></div>
+    </div>
+  </details>
+
+  <!-- ③ 商品えらびサポート（何で運用する？） -->
+  <details class="area" data-area="invest">
+    <summary><span class="a-emoji">🌳</span>③ 何で運用する？（商品えらび）<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead">余裕がわかったら、何で運用するか。<b>集中しすぎ・コスト高すぎ</b>は静かな機会損失。2つの質問に答えると、あなたに合う型がわかります。</p>
+
+      <!-- 2問で決まる商品えらび -->
+      <div class="picker" id="picker">
+        <div class="pk-q">Q1. 商品えらびや配分の調整を、自分でやりたい？</div>
+        <div class="pk-btns" data-q="1">
+          <button type="button" data-v="self">自分でやりたい</button>
+          <button type="button" data-v="auto">任せたい</button>
+        </div>
+        <div class="pk-q2" id="pkQ2" hidden>
+          <div class="pk-q">Q2. 年齢に合わせた「守りへの切り替え」まで自動でやってほしい？</div>
+          <div class="pk-btns" data-q="2">
+            <button type="button" data-v="yes">はい、全部おまかせ</button>
+            <button type="button" data-v="no">配分は自分で決めたい</button>
+          </div>
+        </div>
+        <div class="pk-result" id="pkResult" hidden></div>
+      </div>
 
       <h3 class="sec">選択肢の比較（コストは信託報酬等の年率目安）</h3>
       <div class="tbl-scroll"><table class="cmp-table">
@@ -348,6 +376,29 @@
       <div class="howto"><b>選び方：</b>軸は<b>低コスト×分散</b>（インデックス投信）。自分で調整したくないならバランス型／ターゲットデート。持ち株会は奨励金の範囲でほどほどに。コスト1%の差は30年で資産の2〜3割の差になります。</div>
 
       <div class="checks" data-checks="invest"></div>
+    </div>
+  </details>
+
+  <!-- ④ お金が急に必要な時（備えの知識） -->
+  <details class="area" data-area="borrow">
+    <summary><span class="a-emoji">🆘</span>④ お金が急に必要な時<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
+    <div class="a-body">
+      <p class="a-lead">運用を始めたあとの「もしも」に。急な出費のとき、どう工面するかで<b>総コストが桁違い</b>になります。慌てて選ぶ前に、選択肢を全部知っておくこと自体が備えです。</p>
+
+      <h3 class="sec">5つの選択肢のプロコン（金利は目安）</h3>
+      <div class="tbl-scroll"><table class="cmp-table">
+        <thead><tr><th>方法</th><th>コスト(年)</th><th>強み</th><th>弱み</th></tr></thead>
+        <tbody>
+          <tr><td>親・家族に借りる</td><td>0%</td><td>コストなし・早い</td><td>心理的負担・関係リスク</td></tr>
+          <tr class="worst"><td>サラ金・カードローン<span class="sub">リボ払い含む</span></td><td>15〜18%</td><td>即日・手軽</td><td>圧倒的高金利。常習化しやすい</td></tr>
+          <tr><td>投資商品を売る</td><td>利益に約20%課税</td><td>借金にならない</td><td>複利が止まる・木を切る行為</td></tr>
+          <tr><td>銀行ローン<span class="sub">フリー/目的別</span></td><td>2〜14%</td><td>まとまった額に対応</td><td>審査に日数・使途制限あり</td></tr>
+          <tr class="best"><td>有価証券担保ローン<span class="sub">証券担保・株担保</span></td><td>2〜4%</td><td>売らずに現金化＝複利継続・課税なし</td><td>証券口座と担保余力が必要</td></tr>
+        </tbody>
+      </table></div>
+      <div class="howto"><b>選び方：</b>総コスト順に検討。①家族 → ②担保ローン（投資を持っているなら）→ ③銀行ローン → ④売却（含み益が小さいものから）→ サラ金は最後の手段にしない設計を。</div>
+
+      <div class="checks" data-checks="borrow"></div>
     </div>
   </details>
 
@@ -564,8 +615,73 @@ function renderChecks() {
     sumCompound.hidden = true;
   }
   $("allClear").hidden = !(answered.length === CHECKS.length && hits.length === 0);
+  renderMargin(p);
   renderPlan(p, lossOf);
 }
+
+// ===== ② 余裕診断：いくらまで運用に回せるか（プロフィールから自動計算）=====
+function renderMargin(p) {
+  const box = $("marginBox"); if (!box) return;
+  const emg = emergencyCash(p);
+  const surplus = p.savings - emg;
+  let cls, verdict, advice;
+  if (surplus >= emg * 0.5) {
+    cls = "ok"; verdict = `✅ 余裕あり：約${man(surplus)}万円まで運用に回せます`;
+    advice = "①の奨励金つき制度から埋めていくのが効率的。残す現金は下の表の置き場所へ。";
+  } else if (surplus > 0) {
+    cls = "tight"; verdict = `🌤 少し余裕あり：約${man(surplus)}万円まで`;
+    advice = "無理のない範囲で。まずは①の職場つみたてNISA（いつでも売れる）だけに絞るのも手。DC（60歳まで引き出せない）は土台が厚くなってから。";
+  } else {
+    cls = "short"; verdict = `⚠ まずは現金の確保から（あと約${man(-surplus)}万円）`;
+    advice = "運用より先に生活防衛資金を。①のうちDC・iDeCoは60歳まで引き出せないため、いまは見送りが無難です。";
+  }
+  box.className = `margin-box ${cls}`;
+  box.innerHTML =
+    `<div class="mb-verdict">${verdict}</div>` +
+    `<div class="mb-row"><span>あなたの預貯金</span><b>${man(p.savings)}万円</b></div>` +
+    `<div class="mb-row"><span>残すべき現金（生活費3ヶ月の目安）</span><b>${man(emg)}万円</b></div>` +
+    `<div class="mb-row"><span>運用に回せる余裕</span><b>${surplus > 0 ? "約" + man(surplus) + "万円" : "なし"}</b></div>` +
+    `<div class="mb-note">${advice}<br>※上の「🙋 あなたの前提」の数字から自動計算（生活費は年収の6割/12ヶ月と仮定）。3年以内の大きな出費があれば、その分も現金で残してください。</div>`;
+}
+
+// ===== ③ 2問で決まる商品えらび =====
+const PK_RESULTS = {
+  self: { name: "インデックス投信（全世界株）＋ 必要に応じて債券",
+    pts: ["信託報酬 0.2%以下・実質数千銘柄に分散が目安（例：全世界株インデックス）",
+          "守りが欲しくなったら債券インデックスを足して配分は自分で調整",
+          "コスト1%の差は30年で資産の2〜3割の差になります"] },
+  tdf: { name: "ターゲットデートファンド（退職予定年を選ぶだけ）",
+    pts: ["年齢が上がると自動で守り（債券）寄りに切り替わる＝完全おまかせ",
+          "信託報酬 0.3〜0.7%とやや高め。それでも「続けられる」価値は大きい",
+          "退職予定年（例：2050）に近い商品を選ぶだけ"] },
+  balance: { name: "バランス型ファンド（固定配分・自動リバランス）",
+    pts: ["株:債券の配分を決めれば、日々の調整はファンドが自動でやってくれる",
+          "信託報酬 0.1〜0.5%。8資産均等や株債50:50など配分で選ぶ",
+          "年齢が上がっても自動では守り寄りにならない点だけ注意"] },
+};
+let pkAns = {};
+function renderPicker() {
+  document.querySelectorAll('#picker [data-q="1"] button').forEach(b =>
+    b.classList.toggle("on", pkAns.q1 === b.dataset.v));
+  document.querySelectorAll('#picker [data-q="2"] button').forEach(b =>
+    b.classList.toggle("on", pkAns.q2 === b.dataset.v));
+  $("pkQ2").hidden = pkAns.q1 !== "auto";
+  const key = pkAns.q1 === "self" ? "self"
+    : pkAns.q1 === "auto" && pkAns.q2 === "yes" ? "tdf"
+    : pkAns.q1 === "auto" && pkAns.q2 === "no" ? "balance" : null;
+  const r = key && PK_RESULTS[key];
+  $("pkResult").hidden = !r;
+  if (r) $("pkResult").innerHTML =
+    `<div class="pk-name">🎯 あなたに合う型：${r.name}</div>` +
+    `<ul class="pk-pts">${r.pts.map(t => `<li>${t}</li>`).join("")}</ul>`;
+}
+document.querySelectorAll("#picker .pk-btns button").forEach(b =>
+  b.addEventListener("click", () => {
+    const q = b.closest(".pk-btns").dataset.q;
+    if (q === "1") { pkAns.q1 = b.dataset.v; if (pkAns.q1 === "self") delete pkAns.q2; }
+    else pkAns.q2 = b.dataset.v;
+    renderPicker();
+  }));
 
 /* ===== 🎯 あなたの作戦リスト =====
    見つかった機会損失を客観基準で優先順位づけして「次の一手」を提示する。
@@ -613,6 +729,9 @@ function renderPlan(p, lossOf) {
       lastTier = c.certainty;
     }
     const lv = lossOf(c);
+    // DC は60歳まで引き出せない＝現金の土台がない人には後回しを促す
+    const isDc = c.id === "free-dc";
+    const noMargin = p.savings - emergencyCash(p) <= 0;
     html += `<div class="plan-item" data-id="${c.id}">
       <span class="rank">${rank}</span>
       <div class="pi-main">
@@ -621,8 +740,10 @@ function renderPlan(p, lossOf) {
           <span class="pi-badge amt">年${yen(lv).replace("約","")}</span>
           <span class="pi-badge c${c.certainty}">${TIER[c.certainty].badge}</span>
           <span class="pi-badge eff">⏱ ${effortLabel(c.effortH)}</span>
+          ${isDc ? `<span class="pi-badge lock">🔒 60歳まで引き出せない</span>` : ""}
         </div>
         <div class="pi-rate">⚡ この${effortLabel(c.effortH).replace("約","")}は、時給換算 ${yen(rate(c))} の作業</div>
+        ${isDc && noMargin ? `<div class="pi-warn">⚠ 預貯金が生活費3ヶ月分に満たないため、先に②の現金確保を。</div>` : ""}
       </div>
       <button type="button" class="done-btn" data-done="${c.id}">✓ やった</button>
     </div>`;
@@ -631,7 +752,7 @@ function renderPlan(p, lossOf) {
 
   // 金額化できないが重要な項目（集中リスク）
   $("planWarn").innerHTML = answers["invest-mochikabu"] === "yes"
-    ? `<div class="plan-warn">⚠ 金額にできないが重要：<b>1銘柄への集中</b>は、会社の不調と資産が同時に傷むリスク。奨励金分は活かしつつ分散を（④参照）。</div>`
+    ? `<div class="plan-warn">⚠ 金額にできないが重要：<b>1銘柄への集中</b>は、会社の不調と資産が同時に傷むリスク。奨励金分は活かしつつ分散を（③参照）。</div>`
     : "";
 
   // 対策済み
