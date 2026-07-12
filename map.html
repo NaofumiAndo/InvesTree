@@ -588,6 +588,8 @@ function buildChecks() {
 // ===== 🩺 かんたん診断：1問ずつ出題（あとで＝スキップ可・回答は保存） =====
 let quizSkip = new Set();
 let quizFeedback = null;   // { cls, text } 直前の回答への即時フィードバック
+// 診断で質問を表示中か（表示中は作戦リスト等の更新を抑えて画面を静かに保つ）
+const quizActive = () => quizList.some(c => !answers[c.id] && !quizSkip.has(c.id));
 function renderQuiz(p, lossOf) {
   const total = quizList.length;
   const answeredN = quizList.filter(c => answers[c.id]).length;
@@ -679,7 +681,8 @@ function renderChecks() {
     sumSub.textContent = answered.length === CHECKS.length ? "すべて確認済みです。" : "この調子で残りもチェックしてみましょう。";
   }
   // 30年複利換算：年間の取りこぼし（未対策分）を毎年5%で再投資し続けた場合の差
-  if (remaining.length && total > 0) {
+  // 診断で回答中はサマリーの高さが動かないよう出さない（終了後にまとめて表示）
+  if (remaining.length && total > 0 && !quizActive()) {
     const future = total * ((Math.pow(1.05, 30) - 1) / 0.05);   // ≈ total × 66.4
     sumCompound.innerHTML = `このまま30年つづくと <b>${yen(future)}</b> の差（年5%で再投資した場合）<br>` +
       `🌳 この分だけ、あなたの木は小さく育ちます。<a href="index.html">おかねの木で見る</a>`;
@@ -779,7 +782,9 @@ function renderPlan(p, lossOf) {
   const actionable = hits.filter(c => c.act && lossOf(c) > 0);
   const doneItems = hits.filter(c => c.act && done[c.id]);
   const todo = actionable.filter(c => !done[c.id]);
-  if (!todo.length && !doneItems.length) { card.hidden = true; return; }
+  // 診断で質問に答えている最中は表示しない（1問ごとに画面が動くのを防ぐ）。
+  // 診断を終える・中断すると、見つかった分がまとめて現れる。
+  if (quizActive() || (!todo.length && !doneItems.length)) { card.hidden = true; return; }
   card.hidden = false;
 
   // 並び替え
