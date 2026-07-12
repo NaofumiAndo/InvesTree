@@ -82,7 +82,7 @@
     border-radius: 12px; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink);
     padding: 11px 0; cursor: pointer; transition: all .12s; }
   .quiz-btns button:hover { border-color: var(--accent); background: #f4faf2; }
-  .quiz-btns button.skip { flex: 0 0 auto; min-width: 74px; font-size: 11.5px; color: var(--ink-soft); }
+  .quiz-btns button.unsure { font-size: 12px; color: var(--ink-soft); }
   .quiz-donemsg { margin: 10px 0 6px; font-size: 13px; font-weight: 700; line-height: 1.6; }
   .quiz-help-btn { background: none; border: none; padding: 0; margin: -6px 0 10px;
     font: inherit; font-size: 11.5px; color: var(--accent-dk); text-decoration: underline; cursor: pointer; }
@@ -123,6 +123,7 @@
   .pi-badge.c1 { background: #e8e4f5; color: #6b5ea8; }
   .pi-badge.eff { background: #f0e7d4; color: var(--ink-soft); }
   .pi-badge.lock { background: #f3e4e0; color: #a86450; }
+  .pi-badge.unk { background: #efe9f7; color: #6b5ea8; }
   .pi-warn { margin-top: 5px; font-size: 11px; color: var(--bad); font-weight: 700; }
   .plan-item .pi-rate { margin-top: 4px; font-size: 11px; color: var(--accent-dk); font-weight: 700; }
   .plan-item .done-btn { flex: 0 0 auto; align-self: center; border: 1.5px solid #ead9bd; background: #fff;
@@ -553,6 +554,8 @@ const LS_SORT = "okane_map_sort";
 let answers = {};
 try { answers = JSON.parse(localStorage.getItem(LS_KEY) || "{}"); } catch (e) { answers = {}; }
 const saveAnswers = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(answers)); } catch (e) {} };
+// 機会損失あり＝「はい」または「わからない」（確認していないこと自体がサイン）
+const isHit = id => answers[id] === "yes" || answers[id] === "unknown";
 // 対策済み（✓やった）と並び替えモード
 let done = {};
 try { done = JSON.parse(localStorage.getItem(LS_DONE) || "{}"); } catch (e) { done = {}; }
@@ -589,6 +592,7 @@ function buildChecks() {
         <div class="btns">
           <button type="button" data-ans="yes">はい</button>
           <button type="button" data-ans="no">いいえ</button>
+          <button type="button" data-ans="unknown">わからない</button>
         </div>
       </div>`).join("")
   ).join("");
@@ -601,17 +605,16 @@ function buildChecks() {
     }));
 }
 
-// ===== 🩺 かんたん診断：1問ずつ出題（あとで＝スキップ可・回答は保存） =====
-let quizSkip = new Set();
+// ===== 🩺 かんたん診断：1問ずつ出題（はい／いいえ／わからない） =====
+// 「わからない」＝自分の状況を確認していないサイン → 要確認として機会損失に数える
 let quizFeedback = null;   // { cls, text } 直前の回答への即時フィードバック
 // 診断で質問を表示中か（表示中は作戦リスト等の更新を抑えて画面を静かに保つ）
-const quizActive = () => quizList.some(c => !answers[c.id] && !quizSkip.has(c.id));
+const quizActive = () => quizList.some(c => !answers[c.id]);
 function renderQuiz(p, lossOf) {
   const total = quizList.length;
   const answeredN = quizList.filter(c => answers[c.id]).length;
   $("quizProg").textContent = `${answeredN}/${total}問`;
-  const next = quizList.find(c => !answers[c.id] && !quizSkip.has(c.id));
-  const restN = quizList.filter(c => !answers[c.id]).length;
+  const next = quizList.find(c => !answers[c.id]);
   const body = $("quizBody");
   if (next) {
     body.innerHTML =
@@ -627,7 +630,7 @@ function renderQuiz(p, lossOf) {
       `<div class="quiz-btns">
         <button type="button" data-qa="yes">はい</button>
         <button type="button" data-qa="no">いいえ</button>
-        <button type="button" data-qa="skip" class="skip">あとで</button>
+        <button type="button" data-qa="unknown" class="unsure">わからない</button>
       </div>`;
     if ($("quizHelpBtn")) {
       $("quizHelpBtn").addEventListener("click", () => { $("quizHelp").hidden = !$("quizHelp").hidden; });
@@ -638,23 +641,18 @@ function renderQuiz(p, lossOf) {
       });
     }
     body.querySelectorAll("[data-qa]").forEach(b => b.addEventListener("click", () => {
-      if (b.dataset.qa === "skip") { quizSkip.add(next.id); quizFeedback = null; renderChecks(); return; }
       answers[next.id] = b.dataset.qa;
       saveAnswers();
-      quizFeedback = b.dataset.qa === "yes"
-        ? { cls: "hit", text: `💸 機会損失を発見：${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "金額にできない重要リスク"} — 作戦リストに追加しました` }
+      quizFeedback =
+        b.dataset.qa === "yes" ? { cls: "hit", text: `💸 機会損失を発見：${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "金額にできない重要リスク"} — 作戦リストに追加しました` }
+        : b.dataset.qa === "unknown" ? { cls: "hit", text: "❓ わからない＝まだ確認していないサイン。要確認として作戦リストに追加しました" }
         : { cls: "ok", text: "✓ OK！次にいきましょう" };
       renderChecks();
     }));
-  } else if (restN > 0) {
-    body.innerHTML =
-      `<div class="quiz-donemsg">残り${restN}問は「あとで」にしました。いつでも再開できます（回答は保存済み）。</div>` +
-      `<div class="quiz-btns"><button type="button" id="quizResume">残りに答える</button></div>`;
-    $("quizResume").addEventListener("click", () => { quizSkip.clear(); quizFeedback = null; renderChecks(); });
   } else {
-    const hitsN = quizList.filter(c => answers[c.id] === "yes").length;
+    const hitsN = quizList.filter(c => isHit(c.id)).length;
     body.innerHTML = `<div class="quiz-donemsg">${hitsN
-      ? `🩺 診断完了！機会損失が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
+      ? `🩺 診断完了！機会損失（要確認ふくむ）が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
       : "🎉 診断完了！大きな取りこぼしはありませんでした。"}</div>`;
   }
   $("quizReview").hidden = answeredN === 0;
@@ -668,22 +666,24 @@ function renderChecks() {
     const id = el.getAttribute("data-id");
     const c = CHECKS.find(x => x.id === id);
     const ans = answers[id];
-    el.classList.toggle("hit", ans === "yes");
+    const hit = isHit(id);
+    el.classList.toggle("hit", hit);
     el.classList.toggle("clear", ans === "no");
     const lossEl = el.querySelector(".loss");
     const lv = lossOf(c);
-    lossEl.innerHTML = `💸 機会損失 ${lv > 0 ? `${yen(lv)}/年（概算）` : "あり"}<span class="basis">${c.basis(p)}</span>`;
-    lossEl.hidden = ans !== "yes";
-    el.querySelector(".fix").hidden = ans !== "yes";
+    lossEl.innerHTML = `💸 機会損失 ${lv > 0 ? `${yen(lv)}/年（概算）` : "あり"}${ans === "unknown" ? "・要確認" : ""}<span class="basis">${c.basis(p)}</span>`;
+    lossEl.hidden = !hit;
+    el.querySelector(".fix").hidden = !hit;
     el.querySelector('[data-ans="yes"]').classList.toggle("on-yes", ans === "yes");
     el.querySelector('[data-ans="no"]').classList.toggle("on-no", ans === "no");
+    el.querySelector('[data-ans="unknown"]').classList.toggle("on-yes", ans === "unknown");
   });
   // 領域チップ
   document.querySelectorAll("details.area").forEach(d => {
     const area = d.getAttribute("data-area");
     const list = CHECKS.filter(c => c.area === area);
     const answered = list.filter(c => answers[c.id]);
-    const hits = list.filter(c => answers[c.id] === "yes");
+    const hits = list.filter(c => isHit(c.id));
     const chip = d.querySelector("[data-chip]");
     if (!answered.length) { chip.textContent = "未チェック"; chip.className = "a-chip"; }
     else if (hits.length) { chip.textContent = `損失 ${hits.length}件`; chip.className = "a-chip hit"; }
@@ -692,7 +692,7 @@ function renderChecks() {
   });
   // サマリー（合計・30年換算は「未対策」の分だけ。対策済みは回収として併記）
   const answered = CHECKS.filter(c => answers[c.id]);
-  const hits = CHECKS.filter(c => answers[c.id] === "yes");
+  const hits = CHECKS.filter(c => isHit(c.id));
   const remaining = hits.filter(c => !done[c.id]);
   const recovered = hits.filter(c => done[c.id]).reduce((a, c) => a + lossOf(c), 0);
   const total = remaining.reduce((a, c) => a + lossOf(c), 0);
@@ -806,7 +806,7 @@ const effortLabel = h => h < 0.25 ? "約5分" : h < 0.75 ? "約30分" : `約${h}
 
 function renderPlan(p, lossOf) {
   const card = $("planCard");
-  const hits = CHECKS.filter(c => answers[c.id] === "yes");
+  const hits = CHECKS.filter(c => isHit(c.id));
   const actionable = hits.filter(c => c.act && lossOf(c) > 0);
   const doneItems = hits.filter(c => c.act && done[c.id]);
   const todo = actionable.filter(c => !done[c.id]);
@@ -847,6 +847,7 @@ function renderPlan(p, lossOf) {
           <span class="pi-badge amt">年${yen(lv).replace("約","")}</span>
           <span class="pi-badge c${c.certainty}">${TIER[c.certainty].badge}</span>
           <span class="pi-badge eff">⏱ ${effortLabel(c.effortH)}</span>
+          ${answers[c.id] === "unknown" ? `<span class="pi-badge unk">❓ 要確認</span>` : ""}
           ${isDc ? `<span class="pi-badge lock">🔒 60歳まで引き出せない</span>` : ""}
         </div>
         <div class="pi-rate">⚡ この${effortLabel(c.effortH).replace("約","")}は、時給換算 ${yen(rate(c))} の作業</div>
@@ -858,7 +859,7 @@ function renderPlan(p, lossOf) {
   $("planList").innerHTML = html;
 
   // 金額化できないが重要な項目（集中リスク）
-  $("planWarn").innerHTML = answers["invest-mochikabu"] === "yes"
+  $("planWarn").innerHTML = isHit("invest-mochikabu")
     ? `<div class="plan-warn">⚠ 金額にできないが重要：<b>1銘柄への集中</b>は、会社の不調と資産が同時に傷むリスク。奨励金分は活かしつつ分散を（③参照）。</div>`
     : "";
 
@@ -890,7 +891,6 @@ document.querySelectorAll("#sortToggle button").forEach(b =>
 $("resetChecks").addEventListener("click", () => {
   answers = {};
   done = {};
-  quizSkip.clear();
   quizFeedback = null;
   saveAnswers();
   saveDone();
