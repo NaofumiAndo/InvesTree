@@ -105,11 +105,6 @@
   .quiz-help { background: #f4faf2; border: 1.5px solid #cfe0c9; border-radius: 12px;
     padding: 9px 12px; margin: 0 0 12px; font-size: 12px; color: var(--ink-soft); line-height: 1.65; }
   .quiz-help a { display: block; margin-top: 4px; font-size: 11px; color: var(--accent-dk); }
-  .quiz-review { margin-top: 10px; border-top: 1px dashed #ecdfc8; padding-top: 8px; }
-  .quiz-review > summary { list-style: none; cursor: pointer; font-size: 11.5px; color: var(--ink-soft);
-    text-decoration: underline; }
-  .quiz-review > summary::-webkit-details-marker { display: none; }
-  .rv-area { margin: 10px 0 2px; font-size: 11px; font-weight: 700; color: var(--accent-dk); }
 
   /* 🎯 作戦リスト */
   .plan-card { background: var(--card); border: 2px solid #dcc9a4; border-radius: 18px;
@@ -339,6 +334,9 @@
       <div class="howto"><b>選び方：</b>まず<b>上の会社の制度から</b>（奨励金は即・確定リターン。※持株会は1銘柄集中に注意→③）。次に税優遇（iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
 
       <div class="howto" style="margin-top:12px">⚠ <b>奨励金つきでも中身は「投資」です</b>（DCは60歳まで引き出せません）。金額を決める前に、②でいくらまで運用に回せるかを確認しましょう。</div>
+
+      <h3 class="sec">セルフチェック</h3>
+      <div class="checks" data-checks="free"></div>
     </div>
   </details>
 
@@ -364,6 +362,8 @@
       </table></div>
       <div class="howto"><b>選び方：</b>使う時期の近さで置き分けるのが基本。すぐ使う→優遇金利の普通預金／使わないと決めた分→定期・金銭信託／投資に回す分→MRF。</div>
 
+      <h3 class="sec">セルフチェック</h3>
+      <div class="checks" data-checks="cash"></div>
     </div>
   </details>
 
@@ -405,6 +405,8 @@
       </table></div>
       <div class="howto"><b>選び方：</b>軸は<b>低コスト×分散</b>（インデックス投信）。自分で調整したくないならバランス型／ターゲットデート。持ち株会は奨励金の範囲でほどほどに。コスト1%の差は30年で資産の2〜3割の差になります。</div>
 
+      <h3 class="sec">セルフチェック</h3>
+      <div class="checks" data-checks="invest"></div>
     </div>
   </details>
 
@@ -427,6 +429,8 @@
       </table></div>
       <div class="howto"><b>選び方：</b>①担保ローン（投資を持っているなら）→ ②銀行ローン → ③売却（含み益が小さいものから）の順に総コストで検討。<b>家族・友人からの借入れは、金利ゼロでも関係に値段がつくため原則さけましょう</b>。サラ金・リボも最後の手段にしない設計を。</div>
 
+      <h3 class="sec">セルフチェック</h3>
+      <div class="checks" data-checks="borrow"></div>
     </div>
   </details>
 
@@ -437,10 +441,6 @@
       <span class="quiz-prog" id="quizProg"></span>
     </div>
     <div id="quizBody"></div>
-    <details class="quiz-review" id="quizReview" hidden>
-      <summary>回答を見直す</summary>
-      <div id="reviewHost"></div>
-    </details>
   </div>
 
   <!-- 🎯 あなたの作戦リスト（見つかった機会損失を客観基準で優先順位づけ） -->
@@ -608,11 +608,11 @@ const QUIZ_AREA_ORDER = ["free", "cash", "invest", "borrow"];
 const AREA_LABEL = { free: "① もらい忘れているお金", cash: "② 運用に回せる余裕", invest: "③ 何で運用する？", borrow: "④ 急な出費のとき" };
 const quizList = QUIZ_AREA_ORDER.flatMap(a => CHECKS.filter(c => c.area === a));
 
-// 「回答を見直す」用の一覧（診断カード内・折りたたみ）
+// ①〜④の各セクション内セルフチェック（診断と同じ回答データに同期）
 function buildChecks() {
-  $("reviewHost").innerHTML = QUIZ_AREA_ORDER.map(a =>
-    `<div class="rv-area">${AREA_LABEL[a]}</div>` +
-    CHECKS.filter(c => c.area === a).map(c => `
+  document.querySelectorAll("[data-checks]").forEach(host => {
+    const area = host.getAttribute("data-checks");
+    host.innerHTML = CHECKS.filter(c => c.area === area).map(c => `
       <div class="check" data-id="${c.id}">
         <div class="q">${c.q}</div>
         <div class="loss" hidden></div>
@@ -622,12 +622,13 @@ function buildChecks() {
           <button type="button" data-ans="no">いいえ</button>
           <button type="button" data-ans="unknown">わからない</button>
         </div>
-      </div>`).join("")
-  ).join("");
+      </div>`).join("");
+  });
   document.querySelectorAll(".check .btns button").forEach(btn =>
     btn.addEventListener("click", () => {
       const id = btn.closest(".check").getAttribute("data-id");
       answers[id] = btn.getAttribute("data-ans");
+      lastAnswerVia = "section";   // 個別回答中は作戦リストを隠さない
       saveAnswers();
       renderChecks();
     }));
@@ -636,8 +637,10 @@ function buildChecks() {
 // ===== 🩺 かんたん診断：1問ずつ出題（はい／いいえ／わからない） =====
 // 「わからない」＝自分の状況を確認していないサイン → 要確認として機会損失に数える
 let quizFeedback = null;   // { cls, text } 直前の回答への即時フィードバック
-// 診断で質問を表示中か（表示中は作戦リスト等の更新を抑えて画面を静かに保つ）
-const quizActive = () => quizList.some(c => !answers[c.id]);
+let lastAnswerVia = null;  // "quiz" | "section"：直前の回答手段
+// 診断カードで連続回答中か（そのときだけ作戦リスト等の更新を抑えて静かに保つ。
+// セクション内の個別チェック中は抑えない）
+const quizActive = () => quizList.some(c => !answers[c.id]) && lastAnswerVia === "quiz";
 function renderQuiz(p, lossOf) {
   const total = quizList.length;
   const answeredN = quizList.filter(c => answers[c.id]).length;
@@ -672,6 +675,7 @@ function renderQuiz(p, lossOf) {
     }
     body.querySelectorAll("[data-qa]").forEach(b => b.addEventListener("click", () => {
       answers[next.id] = b.dataset.qa;
+      lastAnswerVia = "quiz";
       saveAnswers();
       quizFeedback =
         b.dataset.qa === "yes" ? { cls: "hit", text: `機会損失 ${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "（金額にできない重要リスク）"} — 作戦リストに追加しました` }
@@ -712,7 +716,7 @@ function renderQuiz(p, lossOf) {
         ? `🩺 診断完了！機会損失（要確認ふくむ）が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
         : "🎉 診断完了！大きな取りこぼしはありませんでした。"}</div>`
       + diff
-      + `<div class="diag-meta">診断日 ${fmt(rec.date)}・次の見直し目安 ${fmt(nextTs)}${overdue ? `<b class="ov"> — そろそろ見直しどきです</b>` : ""}<br>昇給・転職・結婚・引越しなど、暮らしが変わったときも見直しのタイミングです。</div>`
+      + `<div class="diag-meta">診断日 ${fmt(rec.date)}・次の見直し目安 ${fmt(nextTs)}${overdue ? `<b class="ov"> — そろそろ見直しどきです</b>` : ""}<br>昇給・転職・結婚・引越しなど、暮らしが変わったときも見直しのタイミングです。回答の修正は ①〜④ 各セクションの「セルフチェック」からいつでも。</div>`
       + `<div class="diag-actions">
           <button type="button" id="rediagBtn">🔁 いま再診断する</button>
           <a class="cal-link" href="${calUrl}" target="_blank" rel="noopener">📅 半年ごとの見直しをカレンダーに登録</a>
@@ -725,7 +729,6 @@ function renderQuiz(p, lossOf) {
       renderChecks();
     });
   }
-  $("quizReview").hidden = answeredN === 0;
 }
 
 function renderChecks() {
@@ -988,6 +991,7 @@ $("resetChecks").addEventListener("click", () => {
   answers = {};
   done = {};
   quizFeedback = null;
+  lastAnswerVia = null;
   saveAnswers();
   saveDone();
   try { localStorage.removeItem("okane_map_diag"); localStorage.removeItem("okane_map_prevDiag"); } catch (e) {}
