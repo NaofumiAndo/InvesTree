@@ -90,6 +90,16 @@
   .quiz-btns button:hover { border-color: var(--accent); background: #f4faf2; }
   .quiz-btns button.unsure { font-size: 12px; color: var(--ink-soft); }
   .quiz-donemsg { margin: 10px 0 6px; font-size: 13px; font-weight: 700; line-height: 1.6; }
+  .diag-diff { margin: 4px 0 6px; font-size: 12.5px; font-weight: 700; border-radius: 10px; padding: 8px 11px; background: #f0e7d4; color: var(--ink-soft); }
+  .diag-diff.good { background: #eef7ea; color: var(--accent-dk); }
+  .diag-diff.bad { background: #fdf0e6; color: var(--bad); }
+  .diag-meta { margin: 4px 0 10px; font-size: 11px; color: var(--ink-soft); line-height: 1.7; }
+  .diag-meta .ov { color: var(--warn); }
+  .diag-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .diag-actions button { border: 1.5px solid #ead9bd; background: #fff; border-radius: 11px;
+    font: inherit; font-size: 12px; font-weight: 700; color: var(--ink); padding: 8px 13px; cursor: pointer; }
+  .diag-actions button:hover { border-color: var(--accent); }
+  .cal-link { font-size: 11.5px; color: var(--accent-dk); text-decoration: underline; }
   .quiz-help-btn { background: none; border: none; padding: 0; margin: -6px 0 10px;
     font: inherit; font-size: 11.5px; color: var(--accent-dk); text-decoration: underline; cursor: pointer; }
   .quiz-help { background: #f4faf2; border: 1.5px solid #cfe0c9; border-radius: 12px;
@@ -671,9 +681,49 @@ function renderQuiz(p, lossOf) {
     }));
   } else {
     const hitsN = quizList.filter(c => isHit(c.id)).length;
-    body.innerHTML = `<div class="quiz-donemsg">${hitsN
-      ? `🩺 診断完了！機会損失（要確認ふくむ）が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
-      : "🎉 診断完了！大きな取りこぼしはありませんでした。"}</div>`;
+    const totalNow = quizList.filter(c => isHit(c.id)).reduce((a, c) => a + lossOf(c), 0);
+    // ===== 定期チェックのサポート：診断日を記録し、半年ごとの見直しへつなぐ =====
+    let rec = null; try { rec = JSON.parse(localStorage.getItem("okane_map_diag") || "null"); } catch (e) {}
+    if (!rec || rec.hits !== hitsN || rec.total !== totalNow) {
+      rec = { date: Date.now(), hits: hitsN, total: totalNow };
+      try { localStorage.setItem("okane_map_diag", JSON.stringify(rec)); } catch (e) {}
+    }
+    let prev = null; try { prev = JSON.parse(localStorage.getItem("okane_map_prevDiag") || "null"); } catch (e) {}
+    const fmt = ts => { const d = new Date(ts); return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`; };
+    const nextTs = rec.date + 182 * 24 * 3600 * 1000;   // 目安：半年後
+    const overdue = Date.now() > nextTs;
+    // 前回との比較（再診断したときだけ prev が入る）
+    let diff = "";
+    if (prev) {
+      const dv = prev.total - totalNow;
+      diff = dv > 0 ? `<div class="diag-diff good">前回（${fmt(prev.date)}）より、機会損失が 年${yen(dv)} 減りました 🌱</div>`
+        : dv < 0 ? `<div class="diag-diff bad">前回（${fmt(prev.date)}）より、機会損失が 年${yen(-dv)} 増えています</div>`
+        : `<div class="diag-diff">前回（${fmt(prev.date)}）から変化はありません</div>`;
+    }
+    // 半年ごとの見直しをGoogleカレンダーに登録（繰り返し予定）
+    const ymd = d => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const calUrl = "https://calendar.google.com/calendar/render?action=TEMPLATE"
+      + "&text=" + encodeURIComponent("おかねの機会損失チェック（1分診断）")
+      + `&dates=${ymd(new Date(nextTs))}/${ymd(new Date(nextTs + 86400000))}`
+      + "&details=" + encodeURIComponent("機会損失マップで定期チェック: https://naofumiando.github.io/InvesTree/map.html")
+      + "&recur=" + encodeURIComponent("RRULE:FREQ=MONTHLY;INTERVAL=6");
+    body.innerHTML =
+      `<div class="quiz-donemsg">${hitsN
+        ? `🩺 診断完了！機会損失（要確認ふくむ）が ${hitsN}件 見つかりました。下の🎯作戦リストからどうぞ。`
+        : "🎉 診断完了！大きな取りこぼしはありませんでした。"}</div>`
+      + diff
+      + `<div class="diag-meta">診断日 ${fmt(rec.date)}・次の見直し目安 ${fmt(nextTs)}${overdue ? `<b class="ov"> — そろそろ見直しどきです</b>` : ""}<br>昇給・転職・結婚・引越しなど、暮らしが変わったときも見直しのタイミングです。</div>`
+      + `<div class="diag-actions">
+          <button type="button" id="rediagBtn">🔁 いま再診断する</button>
+          <a class="cal-link" href="${calUrl}" target="_blank" rel="noopener">📅 半年ごとの見直しをカレンダーに登録</a>
+        </div>`;
+    $("rediagBtn").addEventListener("click", () => {
+      try { localStorage.setItem("okane_map_prevDiag", JSON.stringify(rec)); } catch (e) {}
+      answers = {};
+      quizFeedback = null;
+      saveAnswers();
+      renderChecks();
+    });
   }
   $("quizReview").hidden = answeredN === 0;
 }
@@ -935,6 +985,7 @@ $("resetChecks").addEventListener("click", () => {
   quizFeedback = null;
   saveAnswers();
   saveDone();
+  try { localStorage.removeItem("okane_map_diag"); localStorage.removeItem("okane_map_prevDiag"); } catch (e) {}
   renderChecks();
 });
 
