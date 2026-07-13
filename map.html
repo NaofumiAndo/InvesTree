@@ -72,10 +72,12 @@
   .quiz-prog { font-size: 11px; font-weight: 700; color: var(--ink-soft); background: #f0e7d4;
     border-radius: 10px; padding: 3px 10px; }
   .quiz-lead { margin: 8px 0 2px; font-size: 11.5px; color: var(--ink-soft); }
-  .quiz-hook { margin: 8px 0 2px; background: #fdf6e4; border: 1.5px solid #ecd9a8; border-radius: 12px;
-    padding: 9px 12px; font-size: 13px; font-weight: 700; line-height: 1.6; }
-  .quiz-hook b { color: var(--bad); font-size: 15px; }
-  .quiz-hook span { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; color: var(--ink-soft); }
+  .quiz-hook { margin: 10px 0 2px; background: #fffdf8; border: 1px solid #e3d4b6;
+    border-left: 3px solid var(--accent-dk); border-radius: 10px;
+    padding: 11px 14px; font-size: 12.5px; line-height: 1.7; color: var(--ink); }
+  .quiz-hook b { font-size: 15px; letter-spacing: 0.01em; }
+  .quiz-hook .hk-sub { display: block; margin-top: 3px; font-size: 11px; color: var(--ink-soft); }
+  .quiz-hook .hk-src { display: block; margin-top: 5px; font-size: 10px; color: var(--ink-soft); opacity: 0.75; }
   .quiz-fb { margin: 8px 0 2px; font-size: 12px; font-weight: 700; border-radius: 10px; padding: 7px 10px; }
   .quiz-fb.hit { background: #fdf0e6; color: var(--bad); }
   .quiz-fb.ok { background: #eef7ea; color: var(--accent-dk); }
@@ -626,7 +628,7 @@ function renderQuiz(p, lossOf) {
     body.innerHTML =
       (quizFeedback
         ? `<div class="quiz-fb ${quizFeedback.cls}">${quizFeedback.text}</div>`
-        : `<div class="quiz-hook">🎁 あなたの会社の制度だけで、最大 <b>${yen(maxPerk)}/年</b> の“もらえるお金”があります。<span>受け取りそこねていないか、1分でチェックできます。わからない言葉は ❓ で確認を。</span></div>`) +
+        : `<div class="quiz-hook">勤務先の制度には、最大 <b>年${yen(maxPerk)}</b> の上乗せ（奨励金・税の軽減）が用意されています。<span class="hk-sub">受け取り状況を、1分で確認できます。わからない言葉は「❓ ことばの説明」をどうぞ。</span><span class="hk-src">※${COMPANY.name}の人事制度データに基づく上限の試算</span></div>`) +
       `<div class="quiz-area">${AREA_LABEL[next.area]}</div>` +
       `<div class="quiz-q">${next.q}</div>` +
       (next.help
@@ -650,9 +652,9 @@ function renderQuiz(p, lossOf) {
       answers[next.id] = b.dataset.qa;
       saveAnswers();
       quizFeedback =
-        b.dataset.qa === "yes" ? { cls: "hit", text: `💸 機会損失を発見：${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "金額にできない重要リスク"} — 作戦リストに追加しました` }
-        : b.dataset.qa === "unknown" ? { cls: "hit", text: "❓ わからない＝まだ確認していないサイン。要確認として作戦リストに追加しました" }
-        : { cls: "ok", text: "✓ OK！次にいきましょう" };
+        b.dataset.qa === "yes" ? { cls: "hit", text: `機会損失 ${lossOf(next) > 0 ? `${yen(lossOf(next))}/年（概算）` : "（金額にできない重要リスク）"} — 作戦リストに追加しました` }
+        : b.dataset.qa === "unknown" ? { cls: "hit", text: "未確認の項目です。「要確認」として作戦リストに追加しました" }
+        : { cls: "ok", text: "✓ 問題ありません。次へどうぞ" };
       renderChecks();
     }));
   } else {
