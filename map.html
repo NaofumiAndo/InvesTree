@@ -145,6 +145,14 @@
   .done-item .d-act { flex: 1; text-decoration: line-through; }
   .done-item .undo-btn { border: none; background: none; font: inherit; font-size: 10.5px;
     color: var(--ink-soft); text-decoration: underline; cursor: pointer; }
+  .plan-more { display: block; width: 100%; margin-top: 8px; padding: 8px 0;
+    border: 1.5px dashed #ead9bd; background: none; border-radius: 11px;
+    font: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
+  .plan-more:hover { border-color: var(--accent); color: var(--accent-dk); }
+  .pi-more { margin-left: 8px; font-size: 10.5px; font-weight: 400; color: var(--accent-dk); }
+  .plan-links { margin-top: 12px; border-top: 1px dashed #ecdfc8; padding-top: 9px;
+    font-size: 11px; color: var(--ink-soft); line-height: 1.8; }
+  .plan-links a { color: var(--accent-dk); text-decoration: underline; }
 
   /* 🏢 勤務先の制度データ（人事連携デモ） */
   .company-box { border: 1.5px solid #cfe0c9; border-radius: 14px; background: #f4faf2;
@@ -319,6 +327,9 @@
       <div class="done-head" id="doneHead"></div>
       <div id="doneList"></div>
     </div>
+    <div class="plan-links" id="planLinks">📚 くわしく知る：
+      <a href="#" data-goto="free">①もらえるお金</a>・<a href="#" data-goto="cash">②現金の余裕</a>・<a href="#" data-goto="invest">③商品えらび</a>・<a href="#" data-goto="borrow">④急な出費</a>
+    </div>
   </div>
 
   <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
@@ -434,14 +445,14 @@
       <div class="tbl-scroll"><table class="cmp-table">
         <thead><tr><th>方法</th><th>コスト(年)</th><th>強み</th><th>弱み</th></tr></thead>
         <tbody>
-          <tr><td>親・家族に借りる</td><td>0%</td><td>コストなし・早い</td><td>心理的負担・関係リスク</td></tr>
+          <tr class="worst"><td>親・家族・友人に借りる</td><td>金利0%でも<br>関係コスト大</td><td>—</td><td>信頼関係はお金で買い戻せない。原則さける</td></tr>
           <tr class="worst"><td>サラ金・カードローン<span class="sub">リボ払い含む</span></td><td>15〜18%</td><td>即日・手軽</td><td>圧倒的高金利。常習化しやすい</td></tr>
           <tr><td>投資商品を売る</td><td>利益に約20%課税</td><td>借金にならない</td><td>複利が止まる・木を切る行為</td></tr>
           <tr><td>銀行ローン<span class="sub">フリー/目的別</span></td><td>2〜14%</td><td>まとまった額に対応</td><td>審査に日数・使途制限あり</td></tr>
           <tr class="best"><td>有価証券担保ローン<span class="sub">証券担保・株担保</span></td><td>2〜4%</td><td>売らずに現金化＝複利継続・課税なし</td><td>証券口座と担保余力が必要</td></tr>
         </tbody>
       </table></div>
-      <div class="howto"><b>選び方：</b>総コスト順に検討。①家族 → ②担保ローン（投資を持っているなら）→ ③銀行ローン → ④売却（含み益が小さいものから）→ サラ金は最後の手段にしない設計を。</div>
+      <div class="howto"><b>選び方：</b>①担保ローン（投資を持っているなら）→ ②銀行ローン → ③売却（含み益が小さいものから）の順に総コストで検討。<b>家族・友人からの借入れは、金利ゼロでも関係に値段がつくため原則さけましょう</b>。サラ金・リボも最後の手段にしない設計を。</div>
 
     </div>
   </details>
@@ -568,6 +579,7 @@ try { done = JSON.parse(localStorage.getItem(LS_DONE) || "{}"); } catch (e) { do
 const saveDone = () => { try { localStorage.setItem(LS_DONE, JSON.stringify(done)); } catch (e) {} };
 let sortMode = "rec";
 try { sortMode = localStorage.getItem(LS_SORT) || "rec"; } catch (e) {}
+let planExpanded = false;   // 作戦リストの4件目以降を開いているか（セッション内のみ）
 
 // あなたの前提（万円で保持、計算時に円へ）。既定は代表値。
 let profile = { incomeMan: 600, savingsMan: 300, monthlyMan: 3 };
@@ -835,19 +847,21 @@ function renderPlan(p, lossOf) {
     b.classList.toggle("on", b.dataset.sort === sortMode));
   $("planNote").textContent = SORT_NOTE[sortMode];
 
-  // リスト描画（おすすめ順のときは階層見出しを挟む）
-  let html = "", rank = 0, lastTier = null;
+  // リスト描画：上位3件だけ見せ、残りは折りたたみ（縦長化を防ぎ「次の一手」に集中）
+  const TOPN = 3;
+  let mainHtml = "", extraHtml = "", rank = 0, lastTier = null;
   for (const c of sorted) {
     rank++;
+    let chunk = "";
     if (sortMode === "rec" && c.certainty !== lastTier) {
-      html += `<div class="tier-head">${TIER[c.certainty].label}</div>`;
+      chunk += `<div class="tier-head">${TIER[c.certainty].label}</div>`;
       lastTier = c.certainty;
     }
     const lv = lossOf(c);
     // DC は60歳まで引き出せない＝現金の土台がない人には後回しを促す
     const isDc = c.id === "free-dc";
     const noMargin = p.savings - emergencyCash(p) <= 0;
-    html += `<div class="plan-item" data-id="${c.id}">
+    chunk += `<div class="plan-item" data-id="${c.id}">
       <span class="rank">${rank}</span>
       <div class="pi-main">
         <div class="pi-act">${c.act}</div>
@@ -858,13 +872,25 @@ function renderPlan(p, lossOf) {
           ${answers[c.id] === "unknown" ? `<span class="pi-badge unk">❓ 要確認</span>` : ""}
           ${isDc ? `<span class="pi-badge lock">🔒 60歳まで引き出せない</span>` : ""}
         </div>
-        <div class="pi-rate">⚡ この${effortLabel(c.effortH).replace("約","")}は、時給換算 ${yen(rate(c))} の作業</div>
+        <div class="pi-rate">⚡ この${effortLabel(c.effortH).replace("約","")}は、時給換算 ${yen(rate(c))} の作業<a href="#" class="pi-more" data-area="${c.area}">くわしく ›</a></div>
         ${isDc && noMargin ? `<div class="pi-warn">⚠ 預貯金が生活費3ヶ月分に満たないため、先に②の現金確保を。</div>` : ""}
       </div>
       <button type="button" class="done-btn" data-done="${c.id}">✓ やった</button>
     </div>`;
+    if (rank <= TOPN) mainHtml += chunk; else extraHtml += chunk;
   }
-  $("planList").innerHTML = html;
+  $("planList").innerHTML = mainHtml +
+    (extraHtml
+      ? `<div id="planExtra" ${planExpanded ? "" : "hidden"}>${extraHtml}</div>` +
+        `<button type="button" class="plan-more" id="planMoreBtn">${planExpanded ? "たたむ ▴" : `のこり${sorted.length - TOPN}件を表示 ▾`}</button>`
+      : "");
+  if ($("planMoreBtn")) $("planMoreBtn").addEventListener("click", () => { planExpanded = !planExpanded; renderChecks(); });
+  // 「くわしく ›」→ 関連セクションを開いてジャンプ
+  card.querySelectorAll(".pi-more").forEach(a => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const d = document.querySelector(`details.area[data-area="${a.dataset.area}"]`);
+    if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+  }));
 
   // 金額化できないが重要な項目（集中リスク）
   $("planWarn").innerHTML = isHit("invest-mochikabu")
@@ -895,6 +921,13 @@ document.querySelectorAll("#sortToggle button").forEach(b =>
     try { localStorage.setItem(LS_SORT, sortMode); } catch (e) {}
     renderChecks();
   }));
+
+// 作戦リスト末尾の「📚 くわしく知る」→ 各セクションを開いてジャンプ
+document.querySelectorAll("#planLinks a").forEach(a => a.addEventListener("click", (e) => {
+  e.preventDefault();
+  const d = document.querySelector(`details.area[data-area="${a.dataset.goto}"]`);
+  if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
+}));
 
 $("resetChecks").addEventListener("click", () => {
   answers = {};
