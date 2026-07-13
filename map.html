@@ -307,43 +307,6 @@
     </div>
   </details>
 
-  <!-- 🩺 かんたん診断（1問ずつ・はい/いいえ。読み物は下の①〜④に分離） -->
-  <div class="quiz-card" id="quizCard">
-    <div class="quiz-head">
-      <span class="quiz-title">🩺 かんたん診断</span>
-      <span class="quiz-prog" id="quizProg"></span>
-    </div>
-    <div id="quizBody"></div>
-    <details class="quiz-review" id="quizReview" hidden>
-      <summary>回答を見直す</summary>
-      <div id="reviewHost"></div>
-    </details>
-  </div>
-
-  <!-- 🎯 あなたの作戦リスト（見つかった機会損失を客観基準で優先順位づけ） -->
-  <div class="plan-card" id="planCard" hidden>
-    <div class="plan-head">
-      <span class="plan-title">🎯 あなたの作戦リスト</span>
-      <div class="sort-toggle" id="sortToggle">
-        <button type="button" data-sort="rec">おすすめ順</button>
-        <button type="button" data-sort="amount">金額順</button>
-        <button type="button" data-sort="effort">手間が少ない順</button>
-      </div>
-    </div>
-    <p class="plan-note" id="planNote"></p>
-    <div id="planList"></div>
-    <div id="planWarn"></div>
-    <div class="done-sec" id="doneSec" hidden>
-      <div class="done-head" id="doneHead"></div>
-      <div id="doneList"></div>
-    </div>
-    <div class="plan-links" id="planLinks">📚 くわしく知る：
-      <a href="#" data-goto="free">①もらえるお金</a>・<a href="#" data-goto="cash">②現金の余裕</a>・<a href="#" data-goto="invest">③商品えらび</a>・<a href="#" data-goto="borrow">④急な出費</a>
-    </div>
-  </div>
-
-  <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
-
   <!-- ① フリーマネー（もらえるお金から始める） -->
   <details class="area" data-area="free">
     <summary><span class="a-emoji">🎁</span>① もらい忘れているお金<span class="a-chip" data-chip>未チェック</span><span class="a-arrow">▶</span></summary>
@@ -466,6 +429,43 @@
 
     </div>
   </details>
+
+  <!-- 🩺 かんたん診断（①〜④を踏まえた確認。1問ずつ・はい/いいえ/わからない） -->
+  <div class="quiz-card" id="quizCard">
+    <div class="quiz-head">
+      <span class="quiz-title">🩺 かんたん診断</span>
+      <span class="quiz-prog" id="quizProg"></span>
+    </div>
+    <div id="quizBody"></div>
+    <details class="quiz-review" id="quizReview" hidden>
+      <summary>回答を見直す</summary>
+      <div id="reviewHost"></div>
+    </details>
+  </div>
+
+  <!-- 🎯 あなたの作戦リスト（見つかった機会損失を客観基準で優先順位づけ） -->
+  <div class="plan-card" id="planCard" hidden>
+    <div class="plan-head">
+      <span class="plan-title">🎯 あなたの作戦リスト</span>
+      <div class="sort-toggle" id="sortToggle">
+        <button type="button" data-sort="rec">おすすめ順</button>
+        <button type="button" data-sort="amount">金額順</button>
+        <button type="button" data-sort="effort">手間が少ない順</button>
+      </div>
+    </div>
+    <p class="plan-note" id="planNote"></p>
+    <div id="planList"></div>
+    <div id="planWarn"></div>
+    <div class="done-sec" id="doneSec" hidden>
+      <div class="done-head" id="doneHead"></div>
+      <div id="doneList"></div>
+    </div>
+    <div class="plan-links" id="planLinks">📚 くわしく知る：
+      <a href="#" data-goto="free">①もらえるお金</a>・<a href="#" data-goto="cash">②現金の余裕</a>・<a href="#" data-goto="invest">③商品えらび</a>・<a href="#" data-goto="borrow">④急な出費</a>
+    </div>
+  </div>
+
+  <div id="allClear" class="allclear" hidden>🎉 大きな取りこぼしなし！お金をしっかり働かせられています。</div>
 
   <p class="foot-note">※ 金利・コスト・概算額は代表的な目安（2026年時点）。実際は金融機関・商品・制度により異なります。<br>このページは教育目的のプロトタイプで、特定商品の勧誘ではありません。</p>
 </div>
@@ -770,7 +770,7 @@ function renderChecks() {
   const sumMain = $("sumMain"), sumSub = $("sumSub"), sumCompound = $("sumCompound");
   if (!answered.length) {
     sumMain.textContent = "チェックを始めよう";
-    sumSub.textContent = "下の診断に答えると、見つかった機会損失がここに集計されます。";
+    sumSub.innerHTML = `①〜④を読みながらでも、いきなりでも。🩺かんたん診断（約1分）に答えると、機会損失がここに集計されます。<a href="#" id="gotoQuiz">診断へ進む ›</a>`;
   } else if (remaining.length) {
     sumMain.innerHTML = `見つかった機会損失 <b>${remaining.length}件</b>${total > 0 ? `・合計 <b>${yen(total)}</b>/年` : ""}${recNote}`;
     sumSub.textContent = `※ざっくり概算です。前提は各項目に記載（回答 ${answered.length}/${CHECKS.length}問）`;
@@ -978,6 +978,11 @@ document.querySelectorAll("#planLinks a").forEach(a => a.addEventListener("click
   const d = document.querySelector(`details.area[data-area="${a.dataset.goto}"]`);
   if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); }
 }));
+
+// サマリーの「診断へ進む ›」→ ページ下部の診断へ（sumSubは再描画されるため委譲で拾う）
+$("sumSub").addEventListener("click", (e) => {
+  if (e.target.id === "gotoQuiz") { e.preventDefault(); $("quizCard").scrollIntoView({ behavior: "smooth", block: "start" }); }
+});
 
 $("resetChecks").addEventListener("click", () => {
   answers = {};
