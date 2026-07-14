@@ -249,6 +249,14 @@
     color: var(--ink-soft); line-height: 1.65; margin: 8px 0; }
   .howto b { color: var(--accent-dk); }
 
+  /* セクション内の折りたたみ（既定は閉じてすっきり） */
+  .sub-fold { margin: 14px 0 4px; }
+  .sub-fold > summary { list-style: none; cursor: pointer; font-size: 13px; font-weight: 700;
+    color: var(--accent-dk); display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+  .sub-fold > summary::-webkit-details-marker { display: none; }
+  .sub-fold .sf-arrow { font-size: 10px; transition: transform .15s; }
+  .sub-fold[open] .sf-arrow { transform: rotate(90deg); }
+
   /* チェック項目 */
   .checks { margin-top: 14px; }
   .check {
@@ -326,16 +334,18 @@
       <div class="checks" data-checks="free"></div>
       <div class="howto">⚠ <b>奨励金つきでも中身は「投資」です</b>（DCは60歳まで引き出せません）。金額を決める前に、②でいくらまで運用に回せるかを確認しましょう。</div>
 
-      <h3 class="sec">その他の代表的なフリーマネー（会社の制度以外）</h3>
-      <div class="tbl-scroll"><table class="cmp-table">
-        <thead><tr><th>制度</th><th>もらえる目安</th><th>確認先</th></tr></thead>
-        <tbody>
-          <tr><td>iDeCo</td><td>掛金が全額所得控除<span class="sub">※会社のDCと併用可否は規約次第</span></td><td>証券会社</td></tr>
-          <tr><td>ふるさと納税</td><td>実質2,000円で返礼品（寄付額の約3割）</td><td>ポータルサイト</td></tr>
-          <tr><td>国・自治体の補助金/給付</td><td>住宅・子育て・省エネ等 数万〜百万円台</td><td>自治体サイト・ミラサポ等</td></tr>
-        </tbody>
-      </table></div>
-      <div class="howto"><b>選び方：</b>まず<b>上の会社の制度から</b>（奨励金は即・確定リターン。※持株会は1銘柄集中に注意→③）。次に税優遇（iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
+      <details class="sub-fold">
+        <summary><span class="sf-arrow">▶</span>その他の代表的なフリーマネー（会社の制度以外）</summary>
+        <div class="tbl-scroll"><table class="cmp-table">
+          <thead><tr><th>制度</th><th>もらえる目安</th><th>確認先</th></tr></thead>
+          <tbody>
+            <tr><td>iDeCo</td><td>掛金が全額所得控除<span class="sub">※会社のDCと併用可否は規約次第</span></td><td>証券会社</td></tr>
+            <tr><td>ふるさと納税</td><td>実質2,000円で返礼品（寄付額の約3割）</td><td>ポータルサイト</td></tr>
+            <tr><td>国・自治体の補助金/給付</td><td>住宅・子育て・省エネ等 数万〜百万円台</td><td>自治体サイト・ミラサポ等</td></tr>
+          </tbody>
+        </table></div>
+        <div class="howto"><b>選び方：</b>まず<b>上の会社の制度から</b>（奨励金は即・確定リターン。※持株会は1銘柄集中に注意→③）。次に税優遇（iDeCo/ふるさと納税）。補助金はライフイベント（引越し・出産・リフォーム）のたびに検索する習慣を。</div>
+      </details>
     </div>
   </details>
 
